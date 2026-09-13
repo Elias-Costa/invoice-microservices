@@ -73,7 +73,7 @@ class IdempotencyIT {
 
   @Container @ServiceConnection
   static final PostgreSQLContainer postgres =
-      new PostgreSQLContainer("postgres:16-alpine").withInitScript("db/idempotency_keys.sql");
+      new PostgreSQLContainer("postgres:16-alpine").withInitScript("db/technical_tables.sql");
 
   private static final String URN = "urn:problem-type:";
   private static final String BODY = "{\"name\":\"Parafuso M6\",\"quantity\":3}";

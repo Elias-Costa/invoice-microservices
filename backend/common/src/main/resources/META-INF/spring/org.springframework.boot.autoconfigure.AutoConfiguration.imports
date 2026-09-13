@@ -1,2 +1,4 @@
 dev.eliascosta.invoice.common.error.web.ErrorHandlingAutoConfiguration
 dev.eliascosta.invoice.common.idempotency.IdempotencyAutoConfiguration
+dev.eliascosta.invoice.common.messaging.KafkaMessagingAutoConfiguration
+dev.eliascosta.invoice.common.outbox.OutboxAutoConfiguration
