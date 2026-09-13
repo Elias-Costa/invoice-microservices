@@ -47,6 +47,9 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-009](#d-009--subclasse-genérica-invalidrequestexception-400-na-hierarquia-de-erros-do-common) | 2026-09-13 | Subclasse genérica `InvalidRequestException` (400) na hierarquia de erros do `common` | aceita | ADR-014 |
 | [D-010](#d-010--origem-do-traceid-no-problemdetail-antes-do-tracing-distribuído) | 2026-09-13 | Origem do `traceId` no `ProblemDetail` antes do tracing distribuído | aceita | ADR-014 |
 | [D-011](#d-011--erros-fora-do-catálogo-88-violação-de-integridade-e-erros-de-protocolo-http) | 2026-09-13 | Erros fora do catálogo §8.8: violação de integridade e erros de protocolo HTTP | aceita | ADR-014 |
+| [D-012](#d-012--escopo-da-idempotency-key-rota-é-o-path-real-da-requisição-não-o-padrão-do-handler) | 2026-09-13 | Escopo da `Idempotency-Key`: rota é o path real da requisição, não o padrão do handler | aceita | ADR-009 |
+| [D-013](#d-013--chave-de-idempotência-in_flight-órfã-permanece-409-até-expirar) | 2026-09-13 | Chave de idempotência `IN_FLIGHT` órfã permanece 409 até expirar | aceita | ADR-009 |
+| [D-014](#d-014--resposta-replayada-pela-idempotência-é-o-mesmo-documento-json-não-os-mesmos-bytes) | 2026-09-13 | Resposta replayada pela idempotência é o mesmo documento JSON, não os mesmos bytes | aceita | ADR-009 |
 
 ---
 
@@ -213,4 +216,46 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Y-statement**: No contexto de erros que escapam da aplicação (constraints de banco, protocolo HTTP), diante de um catálogo pensado para erros de negócio, decidimos discriminar violações de integridade por SQLState em dois slugs e manter o padrão do Spring para erros de protocolo, para dar status coerente sem inflar o catálogo, aceitando `about:blank` nesses casos raros.
 - **Documentos afetados**: `requisitos.md` §8.8 (duas linhas adicionadas em 2026-09-13 após confirmação)
 - **ADR**: ADR-014
+- **Substitui**: —
+
+### D-012 — Escopo da `Idempotency-Key`: rota é o path real da requisição, não o padrão do handler
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: agente (trivial, informado no plano de F1-03)
+- **Contexto**: `modelo-de-dados.md` §6.3 define `idempotency_keys.route` como "método + rota (`POST /invoices`)" e o `request_hash` como hash **do corpo**. Para `POST /invoices/{id}/print` o corpo é vazio: se `route` fosse o padrão do handler (`POST /invoices/{id}/print`), a mesma chave reenviada para **outra** nota teria rota e hash iguais e receberia, como replay, a resposta da primeira nota.
+- **Opções consideradas**: 1) `route` = método + path real da requisição (`POST /invoices/3fa8…/print`), hash só do corpo — path variables discriminam naturalmente; 2) `route` = padrão do handler e hash sobre path + corpo — contraria a definição de `request_hash` no modelo; 3) `route` = padrão e ignorar o problema — incorreto.
+- **Decisão**: (1). `route` armazena `<MÉTODO> <requestURI sem query string>`; chave reutilizada em path diferente responde `422 idempotency-key-payload-mismatch`, como já previa §6.3 para "route diferente". O padrão de handler não é usado.
+- **Consequências**: + correto para ações sem corpo (`/print`, `/cancel`, `/reactivate`); + nenhuma mudança de schema (`route varchar(200)` comporta o path com UUID). − reenvio da mesma chave para outro recurso é rejeitado com 422 em vez de executado — comportamento desejado.
+- **Y-statement**: No contexto de ações `POST` sem corpo identificadas apenas pelo path, diante do risco de um replay devolver a resposta de outro recurso, decidimos escopar a chave pelo path real da requisição para que a idempotência seja por recurso, aceitando que a mesma chave nunca sirva para dois recursos.
+- **Documentos afetados**: — (§6.3 já diz "método + rota"; o exemplo `POST /invoices` continua válido)
+- **ADR**: ADR-009 (idempotência) deve incorporar esta decisão ao ser escrito
+- **Substitui**: —
+
+### D-013 — Chave de idempotência `IN_FLIGHT` órfã permanece 409 até expirar
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RN-16 e `modelo-de-dados.md` §6.3 dizem "chave em processamento → 409". Se o serviço cair (ou for reiniciado) entre o `INSERT (IN_FLIGHT)` e a conclusão, a linha fica `IN_FLIGHT` sem ninguém para completá-la ou removê-la; os documentos não dizem o que acontece com reenvios dessa chave.
+- **Opções consideradas**: 1) nenhum tratamento especial: a chave responde 409 até o TTL de 24 h; o cliente gera nova chave para nova tentativa (o frontend só reutiliza a chave em retries automáticos, §8.9); 2) timeout de in-flight configurável (ex.: 60 s) após o qual um novo claim retoma a chave e reexecuta — recupera de crash sem nova chave, mas arrisca execução dupla quando a original só está lenta (Estoque com timeout + retry + circuit breaker pode passar de 10 s).
+- **Decisão**: (1). Chave órfã fica `IN_FLIGHT` até `expires_at`; o claim atômico só reaproveita linhas expiradas. Zero risco de execução dupla; comportamento idêntico ao descrito nos documentos.
+- **Consequências**: + semântica simples e segura; + nenhum parâmetro novo. − após um crash, aquela chave específica fica inutilizável por até 24 h (o usuário recarrega o formulário e recebe nova chave).
+- **Y-statement**: No contexto de uma chave `IN_FLIGHT` deixada por um crash, diante da escolha entre recuperação automática e segurança contra execução dupla, decidimos manter o 409 até a expiração para nunca executar duas vezes, aceitando que a chave fique presa até 24 h.
+- **Documentos afetados**: —
+- **ADR**: ADR-009 (idempotência) deve incorporar esta decisão ao ser escrito
+- **Substitui**: —
+
+### D-014 — Resposta replayada pela idempotência é o mesmo documento JSON, não os mesmos bytes
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: agente (trivial, informado no relatório de F1-03)
+- **Contexto**: RN-16 diz "mesma chave + mesmo payload → mesma resposta". `modelo-de-dados.md` §6.3 armazena o corpo em `response_body jsonb`. O `jsonb` do PostgreSQL guarda o documento decomposto e o devolve renormalizado: espaços após `:` e `,`, chaves reordenadas (por tamanho, depois bytes) e duplicatas removidas. O IT de F1-03 mostrou que o replay de `{"id":"…","name":"…"}` volta como `{"id": "…", "name": "…"}` e que um `ProblemDetail` volta com as chaves em outra ordem.
+- **Opções consideradas**: 1) aceitar igualdade **semântica**: o replay é o mesmo documento JSON (mesmos campos e valores), sem garantir bytes, ordem de chaves ou espaçamento; 2) trocar a coluna para `json` (preserva o texto) — altera o schema documentado e perde indexação/validação do `jsonb`; 3) guardar o corpo como string JSON escapada dentro do `jsonb` — preserva bytes, mas anula o propósito do tipo e dobra o escape.
+- **Decisão**: (1). Nenhum cliente JSON depende de ordem de chaves ou espaçamento; testes comparam árvores JSON, não texto. Sem mudança de schema.
+- **Consequências**: + schema e semântica do modelo mantidos; + testes robustos a formatação. − uma comparação byte a byte de replay (ex.: `diff` de `curl` em script de demonstração) precisa passar por `jq -S` ou equivalente.
+- **Y-statement**: No contexto do replay de respostas armazenadas em `jsonb`, diante da renormalização feita pelo PostgreSQL, decidimos definir "mesma resposta" como igualdade de documento JSON para manter o schema documentado, aceitando que bytes, ordem de chaves e espaçamento possam diferir.
+- **Documentos afetados**: — (RN-16 permanece válida com esta leitura)
+- **ADR**: ADR-009 (idempotência) deve registrar esta nuance
 - **Substitui**: —

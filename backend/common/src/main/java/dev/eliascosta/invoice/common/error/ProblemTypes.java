@@ -22,6 +22,12 @@ public final class ProblemTypes {
   /** 409 — unique constraint violated at the database (safety net, D-011). */
   public static final String UNIQUE_CONSTRAINT_VIOLATION = "unique-constraint-violation";
 
+  /** 409 — a request with the same {@code Idempotency-Key} is still being processed (RN-16). */
+  public static final String IDEMPOTENCY_KEY_IN_FLIGHT = "idempotency-key-in-flight";
+
+  /** 422 — {@code Idempotency-Key} reused with a different body or route (RN-16). */
+  public static final String IDEMPOTENCY_KEY_PAYLOAD_MISMATCH = "idempotency-key-payload-mismatch";
+
   /** 422 — other database constraint violated (FK, CHECK, NOT NULL) (safety net, D-011). */
   public static final String DATA_INTEGRITY_VIOLATION = "data-integrity-violation";
 
