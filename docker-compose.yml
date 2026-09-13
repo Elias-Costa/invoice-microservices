@@ -1,0 +1,136 @@
+# Infra local do invoice-microservices — requisitos.md §8.2/§8.13, RNF-RUN-01, RNF-RES-06.
+#
+#   docker compose up -d                    # postgres-stock, postgres-billing, kafka
+#   docker compose --profile tools up -d    # + Kafka UI em http://localhost:8090
+#   docker compose down                     # NUNCA use -v sem confirmar: apaga os bancos
+#
+# Variáveis: .env.example lista todas; os defaults abaixo são os mesmos valores, então a stack
+# sobe sem `.env`. Portas de bancos e Kafka são publicadas apenas em 127.0.0.1 (D-018).
+# Os serviços da aplicação entram aqui nas tarefas seguintes (stock-service, billing-service,
+# api-gateway, frontend); Keycloak e observabilidade, na Fase 2.
+
+name: invoice-microservices
+
+# Configuração comum aos dois bancos (um por serviço — C3, ADR-004). O script de init cria a
+# role de aplicação e o banco a partir de APP_DB_* (D-021).
+x-postgres: &postgres
+  image: postgres:16-alpine
+  restart: unless-stopped
+  networks: [internal]
+  healthcheck:
+    # Via TCP (-h): durante o init o servidor temporário só escuta no socket Unix,
+    # então o probe não dá falso positivo antes de os scripts de init terminarem.
+    test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER:-postgres}\""]
+    interval: 5s
+    timeout: 5s
+    retries: 10
+    start_period: 10s
+
+services:
+  postgres-stock:
+    <<: *postgres
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      APP_DB_NAME: stock_db
+      APP_DB_USER: ${POSTGRES_STOCK_USER:-stock_user}
+      APP_DB_PASSWORD: ${POSTGRES_STOCK_PASSWORD:-stock_pass}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-stock-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-db.sh:/docker-entrypoint-initdb.d/10-init-db.sh:ro
+
+  postgres-billing:
+    <<: *postgres
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      APP_DB_NAME: billing_db
+      APP_DB_USER: ${POSTGRES_BILLING_USER:-billing_user}
+      APP_DB_PASSWORD: ${POSTGRES_BILLING_PASSWORD:-billing_pass}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - postgres-billing-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-db.sh:/docker-entrypoint-initdb.d/10-init-db.sh:ro
+
+  # A imagem do Kafka roda como appuser (uid 1000) e um volume nomeado nasce root:root;
+  # este serviço de uma execução só ajusta o dono do diretório de dados (D-019).
+  kafka-init:
+    image: apache/kafka-native:4.2.1
+    user: "0:0"
+    entrypoint: ["chown", "-R", "1000:1000", "/var/lib/kafka/data"]
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    network_mode: none
+
+  kafka:
+    image: apache/kafka-native:4.2.1
+    restart: unless-stopped
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    networks: [internal]
+    ports:
+      - "127.0.0.1:9092:9094" # listener EXTERNAL, anunciado como localhost:9092
+    environment:
+      # KRaft em nó único com os papéis broker e controller (§8.1: sem ZooKeeper).
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # INTERNAL: serviços na rede `internal` (kafka:9092).
+      # EXTERNAL: clientes no host (localhost:9092, mapeado para a porta 9094 do container).
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      # Nó único: fatores de replicação 1; sem atraso no primeiro rebalance dos consumidores.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Tópicos de negócio são criados pelo KafkaAdmin dos serviços com as partições de §8.7 (D-017).
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      # UUID em base64url (22 caracteres), fixo para o `kafka-storage format` ser determinístico.
+      CLUSTER_ID: FPNkHsMQW0GhPpsMhGzElg
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+      - ./infra/kafka/healthcheck.sh:/healthcheck.sh:ro
+    healthcheck:
+      # Probe de protocolo (ApiVersions): a imagem nativa não tem os scripts CLI e um teste
+      # de porta daria falso positivo antes de o broker estar RUNNING (D-019).
+      test: ["CMD", "bash", "/healthcheck.sh"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:v1.5.0
+    profiles: [tools]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks: [internal]
+    ports:
+      - "127.0.0.1:8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: invoice-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+networks:
+  # `edge`: frontend, api-gateway e Keycloak (entram em F1-22, F1-29 e F2-01).
+  # `internal`: serviços de domínio, bancos e Kafka (§8.13).
+  edge:
+  internal:
+
+volumes:
+  postgres-stock-data:
+  postgres-billing-data:
+  kafka-data:

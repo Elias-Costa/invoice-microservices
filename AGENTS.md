@@ -32,8 +32,10 @@ npm run build
 npx playwright test
 
 # Infra local — executar na raiz
-docker compose up --build -d                       # stack completa
+docker compose up --build -d                       # stack completa (infra: postgres-stock 5433, postgres-billing 5434, kafka 9092 — só em 127.0.0.1)
+docker compose --profile tools up -d               # + Kafka UI em http://localhost:8090
 docker compose --profile observability up -d       # + Prometheus, Grafana, Zipkin
+docker compose ps                                  # todos devem ficar `healthy`
 docker compose logs -f stock-service
 docker compose down                                # NUNCA use -v sem confirmar: apaga os bancos
 ```

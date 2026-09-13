@@ -53,6 +53,10 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-015](#d-015--evento-da-outbox-é-abandonado-após-n-falhas-definitivas-de-publicação-coluna-failed_at) | 2026-09-13 | Evento da outbox é abandonado após N falhas definitivas de publicação (coluna `failed_at`) | aceita | ADR-007 |
 | [D-016](#d-016--businessruleexception-em-listener-kafka-não-retentável-vai-direto-ao-dlt) | 2026-09-13 | `BusinessRuleException` em listener Kafka: não-retentável, vai direto ao DLT | aceita | ADR-006 |
 | [D-017](#d-017--tópicos-kafka-criados-pelo-kafkaadmin-a-partir-de-invoicekafkatopics) | 2026-09-13 | Tópicos Kafka criados pelo `KafkaAdmin` a partir de `invoice.kafka.topics` | aceita | ADR-006 |
+| [D-018](#d-018--bancos-e-kafka-publicam-portas-apenas-em-loopback-sem-perfil-dev-no-compose) | 2026-09-13 | Bancos e Kafka publicam portas apenas em loopback; sem perfil `dev` no Compose | aceita | — |
+| [D-019](#d-019--imagem-apachekafka-native421-com-healthcheck-por-probe-apiversions-e-volume-inicializado-por-kafka-init) | 2026-09-13 | Imagem `apache/kafka-native:4.2.1` com healthcheck por probe `ApiVersions` e volume inicializado por `kafka-init` | aceita | ADR-001 |
+| [D-020](#d-020--kafka-ui-ghcriokafbatkafka-uiv150-fork-mantido) | 2026-09-13 | Kafka UI: `ghcr.io/kafbat/kafka-ui:v1.5.0` (fork mantido) | aceita | ADR-001 |
+| [D-021](#d-021--role-de-aplicação-não-superusuário-por-banco-criada-por-script-de-init-variáveis-postgres_) | 2026-09-13 | Role de aplicação não-superusuário por banco, criada por script de init; variáveis `POSTGRES_*` | aceita | ADR-004 |
 
 ---
 
@@ -303,4 +307,60 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Y-statement**: No contexto da criação dos tópicos com o número de partições do contrato, diante de auto-criação com 1 partição, decidimos declará-los por propriedade no `common` e deixar o `KafkaAdmin` criá-los para manter contrato e código no mesmo lugar, aceitando uma propriedade adicional.
 - **Documentos afetados**: —
 - **ADR**: ADR-006
+- **Substitui**: —
+
+### D-018 — Bancos e Kafka publicam portas apenas em loopback; sem perfil `dev` no Compose
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: `requisitos.md` §8.13 dizia que bancos e Kafka "não expõem portas por padrão exceto para desenvolvimento (`ports` sob perfil `dev`)". O Docker Compose não permite condicionar `ports` a um perfil (perfis selecionam serviços inteiros), e as tarefas F1-06/F1-09 precisam de acesso do host (`./mvnw spring-boot:run` com perfil `local`, clientes SQL, inspeção do Kafka). Era preciso escolher o mecanismo real.
+- **Opções consideradas**: 1) um único `docker-compose.yml` publicando as portas ligadas a `127.0.0.1` (`127.0.0.1:5433`, `127.0.0.1:5434`, `127.0.0.1:9092`) — simples, um arquivo, nunca acessível fora da máquina; 2) arquivo base sem `ports` + `docker-compose.override.yml` versionado (carregado automaticamente) — idiomático, mas o padrão continua exposto e há um arquivo a mais; 3) `docker-compose.dev.yml` opt-in via `-f` ou `COMPOSE_FILE` no `.env` — cumpre a frase ao pé da letra, mas alonga os comandos ou depende do `.env`, menos óbvio para quem clona.
+- **Decisão**: (1). A propriedade de segurança pretendida por §8.13 (não expor bancos e broker à rede) é obtida pelo *bind* em loopback; o Kafka ganha dois listeners (`INTERNAL://kafka:9092` na rede `internal`, `EXTERNAL://localhost:9092` publicado no host a partir da porta 9094 do container). §8.13 é reescrito para descrever isso.
+- **Consequências**: + um arquivo, comportamento único para avaliador e desenvolvedor; + `spring-boot:run` e clientes SQL funcionam sem passos extras. − não existe forma "fechada" da stack (irrelevante: P1 diz que não há deploy público); − o texto de §8.13 muda.
+- **Y-statement**: No contexto de uma stack local sem deploy público, diante da impossibilidade de condicionar `ports` a perfis do Compose, decidimos publicar as portas de bancos e Kafka apenas em `127.0.0.1` num único arquivo, para manter simplicidade e acesso de desenvolvimento, aceitando que a stack nunca rode "fechada".
+- **Documentos afetados**: `requisitos.md` §8.13 (reescrito em 2026-09-13 após confirmação)
+- **ADR**: —
+- **Substitui**: —
+
+### D-019 — Imagem `apache/kafka-native:4.2.1` com healthcheck por probe `ApiVersions` e volume inicializado por `kafka-init`
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: ADR-001 deixou a tag da imagem do Kafka para a infra (F1-05). Os ITs do `common` (F1-04) já usam `apache/kafka-native:4.2.1`. RNF-RES-06 exige `healthcheck` real (os serviços dependerão de `kafka` `healthy` para o `KafkaAdmin` criar os tópicos com as partições de §8.7 — D-017). Verificado empiricamente: a imagem nativa não traz os scripts CLI (`kafka-topics.sh`, `kafka-broker-api-versions.sh`), tem `bash`/`nc`/`wget`, fica `RUNNING` em < 1 s; um teste de porta (`nc -z`) dá falso positivo porque o broker abre o socket antes de habilitar o processamento de requisições; um probe de protocolo `ApiVersions` (api_key 18, v0) via `nc` só recebe resposta quando o broker está servindo. Também verificado: a imagem roda como `appuser` (uid 1000) e um volume nomeado montado em caminho inexistente na imagem nasce `root:root` → `Permission denied` ao formatar o storage.
+- **Opções consideradas**: 1) `apache/kafka-native:4.2.1` — igual aos ITs, ~140 MB, ~150 MB de RAM, subida < 1 s; healthcheck por script `infra/kafka/healthcheck.sh` (probe `ApiVersions`); 2) `apache/kafka:4.2.1` (JVM) — CLI completa e healthcheck legível com `kafka-broker-api-versions.sh`; custo: ~400 MB de imagem, ~700 MB de RAM, 5–10 s de subida, cada probe sobe uma JVM. Para o volume: a) serviço `kafka-init` (mesma imagem, `user: "0:0"`, `chown 1000:1000`) com `depends_on: condition: service_completed_successfully`; b) rodar o broker como root — contraria o espírito de RNF-RUN-03; c) sem volume — perde mensagens em voo num `docker compose down` (exatamente o que outbox + persistência devem evitar).
+- **Decisão**: (1) + (a). Healthcheck: `bash /healthcheck.sh` (montado de `infra/kafka/healthcheck.sh`, sem depender de bit de execução), intervalo 5 s. Dados em `KAFKA_LOG_DIRS=/var/lib/kafka/data` no volume `kafka-data`; `CLUSTER_ID` fixo para o `kafka-storage format` ser determinístico. Auto-criação de tópicos permanece no padrão do broker (habilitada), como pressupõem D-017 e o Registro de F1-04.
+- **Consequências**: + mesma versão de broker em teste e execução; + subida quase instantânea (RNF-RUN-04); + healthcheck que reflete prontidão real. − inspeção de tópicos só pelo Kafka UI (perfil `tools`) ou por clientes externos; − um serviço auxiliar (`kafka-init`) e um script no repositório; − a imagem nativa é marcada como experimental pelo projeto Kafka (aceitável para ambiente local).
+- **Y-statement**: No contexto da infra local, diante de uma imagem sem CLI mas muito mais leve e já usada nos testes, decidimos fixar `apache/kafka-native:4.2.1` com um probe de protocolo como healthcheck e um init de volume, para ter subida rápida e ordenação confiável de dependências, aceitando a ausência de ferramentas de linha de comando no container.
+- **Documentos afetados**: `requisitos.md` §8.3 (árvore `infra/kafka/`, atualizada em 2026-09-13 após confirmação)
+- **ADR**: ADR-001 (tag registrada aqui; o ADR permanece imutável)
+- **Substitui**: —
+
+### D-020 — Kafka UI: `ghcr.io/kafbat/kafka-ui:v1.5.0` (fork mantido)
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: §8.2 e RNF-RUN-01 preveem "Kafka UI" no perfil `tools` (8090) sem indicar a imagem. O projeto original `provectuslabs/kafka-ui` não recebe versões desde v0.7.2 (2024-04-10); o fork `kafbat/kafka-ui` é o mantido (v1.5.0 em 2026-04-20), com a mesma interface e as mesmas variáveis (`KAFKA_CLUSTERS_0_*`), e suporta Kafka 4.x/KRaft.
+- **Opções consideradas**: 1) `ghcr.io/kafbat/kafka-ui:v1.5.0`; 2) `provectuslabs/kafka-ui:v0.7.2` — nome mais conhecido, no Docker Hub, sem manutenção e sem garantia com Kafka 4.x.
+- **Decisão**: (1). Serviço `kafka-ui` no perfil `tools`, rede `internal`, `depends_on: kafka: service_healthy`, porta `127.0.0.1:8090:8080`.
+- **Consequências**: + compatível com o broker escolhido; + segurança recebe correções. − imagem no GHCR (não no Docker Hub).
+- **Y-statement**: No contexto de uma ferramenta opcional de inspeção, diante de um projeto abandonado e seu fork mantido, decidimos o fork para garantir compatibilidade com Kafka 4.x, aceitando o registro GHCR.
+- **Documentos afetados**: —
+- **ADR**: ADR-001 (tag registrada aqui)
+- **Substitui**: —
+
+### D-021 — Role de aplicação não-superusuário por banco, criada por script de init; variáveis `POSTGRES_*`
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a Entrega de F1-05 pede "scripts de init dos bancos (`CREATE DATABASE stock_db/billing_db` + usuários)" e `.env.example` com `POSTGRES_*` (§8.13, RNF-SEC-06), mas nenhum documento fixa nomes de usuários, quem é superusuário nem os nomes das variáveis — e esses nomes serão usados por `application.yml` (F1-06/F1-14) e pelos serviços no Compose (F1-13/F1-21).
+- **Opções consideradas**: 1) superusuário `postgres` (`POSTGRES_PASSWORD`, só para administração e init) + roles de aplicação **não-superusuárias** `stock_user`/`billing_user`, owners de `stock_db`/`billing_db`, criadas por um único `infra/postgres/init-db.sh` parametrizado por `APP_DB_NAME/APP_DB_USER/APP_DB_PASSWORD` e montado nos dois containers; 2) usar `POSTGRES_USER`/`POSTGRES_DB` da imagem em cada container (a aplicação roda como superusuário; sem script) — menos peças, mas contraria a Entrega e o princípio de menor privilégio.
+- **Decisão**: (1). Nomes dos bancos fixos (`stock_db`, `billing_db`, como no modelo de dados); variáveis: `POSTGRES_PASSWORD`, `POSTGRES_STOCK_USER`, `POSTGRES_STOCK_PASSWORD`, `POSTGRES_BILLING_USER`, `POSTGRES_BILLING_PASSWORD`, com valores de desenvolvimento em `.env.example` e os mesmos valores como default (`${VAR:-…}`) no `docker-compose.yml`, para que `docker compose up --build` funcione sem `.env` (RNF-RUN-01). `pg_trgm` é extensão *trusted* (PG ≥ 13), então o owner do banco executa `V1__extensions` sem ser superusuário — verificado na entrega. Migrações são executadas pelo mesmo usuário da aplicação (Flyway do serviço).
+- **Consequências**: + aplicação com menor privilégio; + credenciais por serviço (C3: nenhum serviço acessa o banco do outro); + stack sobe sem passo manual. − um script no repositório; − o superusuário compartilha a senha entre os dois containers (aceitável localmente); − extensões não *trusted* (nenhuma prevista) exigiriam mudança no init.
+- **Y-statement**: No contexto de dois bancos PostgreSQL em containers, diante da ausência de definição de usuários e variáveis, decidimos criar por script uma role de aplicação sem privilégios de superusuário por banco e padronizar `POSTGRES_*` com defaults no Compose, para menor privilégio e subida em um comando, aceitando um script e uma senha de superusuário compartilhada.
+- **Documentos afetados**: `requisitos.md` §8.3 (árvore `infra/postgres/`, atualizada em 2026-09-13 após confirmação)
+- **ADR**: ADR-004 (banco por serviço) pode registrar esta decisão ao ser escrito
 - **Substitui**: —

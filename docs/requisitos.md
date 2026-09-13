@@ -759,6 +759,8 @@ invoice-microservices/
 │   └── billing-service/
 ├── frontend/                   # Angular workspace
 ├── infra/
+│   ├── postgres/init-db.sh     # role de aplicação + banco, por container (D-021)
+│   ├── kafka/healthcheck.sh    # probe ApiVersions — imagem nativa sem CLI (D-019)
 │   ├── keycloak/realm-invoice.json
 │   ├── grafana/{provisioning,dashboards}/
 │   ├── prometheus/prometheus.yml
@@ -1070,7 +1072,7 @@ resilience4j:
 
 ### 8.13 Ambiente de execução
 
-- `docker-compose.yml` com serviços listados em [§8.2](#82-componentes-e-responsabilidades), redes `edge` (frontend, gateway, keycloak) e `internal` (serviços, bancos, kafka); bancos e Kafka não expõem portas por padrão exceto para desenvolvimento (`ports` sob perfil `dev`).
+- `docker-compose.yml` com serviços listados em [§8.2](#82-componentes-e-responsabilidades), redes `edge` (frontend, gateway, keycloak) e `internal` (serviços, bancos, kafka); bancos e Kafka publicam portas apenas na interface de loopback do host (`127.0.0.1:5433`, `127.0.0.1:5434`, `127.0.0.1:9092`) para desenvolvimento local — dentro da rede `internal` os serviços usam `postgres-stock:5432`, `postgres-billing:5432` e `kafka:9092` (D-018).
 - Perfil Spring `docker` ativa hosts internos; perfil `demo` ativa seed (Flyway `R__seed_demo.sql`) e chaos.
 - Seed: 12 produtos (saldos variados, incluindo `balance = 1`, `balance = 0` e um inativo), 5 clientes, 5 notas (`OPEN` ×3, `CLOSED`, `CANCELED`) — detalhado em [modelo-de-dados.md §13](modelo-de-dados.md#13-dados-de-demonstração-seed).
 - Variáveis em `.env.example`: `POSTGRES_*`, `KEYCLOAK_ADMIN*`, `BILLING_CLIENT_SECRET`, `SPRING_PROFILES_ACTIVE`.
