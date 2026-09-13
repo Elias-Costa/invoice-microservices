@@ -1,0 +1,22 @@
+# Normalize line endings: LF in the repository, LF on checkout for every platform
+* text=auto eol=lf
+
+# Scripts that must keep a specific line ending to run
+mvnw        text eol=lf
+*.sh        text eol=lf
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binary files
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.pdf       binary
+*.jar       binary
+*.zip       binary
+*.ttf       binary
+*.woff      binary
+*.woff2     binary

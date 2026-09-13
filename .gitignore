@@ -1,0 +1,49 @@
+# Configuração local da ferramenta de agente (settings, hooks, rules, skills)
+.claude/
+CLAUDE.local.md
+
+# Documento de escopo local (não versionado — requisitos.md §8.3)
+docs/escopo.pdf
+
+# Segredos e ambiente
+.env
+.env.*
+!.env.example
+
+# Java / Maven
+target/
+*.class
+*.log
+.mvn/wrapper/dists/
+hs_err_pid*
+replay_pid*
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+coverage/
+.eslintcache
+npm-debug.log*
+yarn-error.log*
+
+# Playwright
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+e2e/playwright/.cache/
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.factorypath
+*.swp
+*~
