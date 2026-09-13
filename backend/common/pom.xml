@@ -13,4 +13,33 @@
   <artifactId>common</artifactId>
   <name>invoice-microservices :: common</name>
   <description>Shared infrastructure only (error handling, idempotency, outbox); no domain code</description>
+
+  <dependencies>
+    <!-- Error handling: @RestControllerAdvice producing RFC 9457 ProblemDetail (requisitos §8.8).
+         Consumers are servlet applications; the WebFlux gateway must not depend on this module. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <!-- org.springframework.dao exceptions (DataIntegrityViolation, OptimisticLockingFailure) -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+    </dependency>
+    <!-- jakarta.persistence.OptimisticLockException -->
+    <dependency>
+      <groupId>jakarta.persistence</groupId>
+      <artifactId>jakarta.persistence-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
 </project>

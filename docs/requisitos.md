@@ -995,10 +995,12 @@ Todo erro retorna `application/problem+json`:
 | `product-code-already-exists`, `customer-document-already-exists` | 409 | Unicidade |
 | `invalid-invoice-status` | 409 | Transição inválida (inclui `currentStatus`, `allowedTransitions`) |
 | `optimistic-lock-conflict` | 409 | Edição concorrente |
+| `unique-constraint-violation` | 409 | Violação de unicidade no banco não tratada pela aplicação (SQLState `23505`) — rede de segurança; a aplicação deve detectar antes e usar o `type` específico (D-011) |
 | `idempotency-key-in-flight` | 409 | Chave em processamento |
 | `product-inactive`, `customer-inactive` | 422 | RN-03, RN-20 |
 | `insufficient-stock` | 422 | RN-02 |
 | `idempotency-key-payload-mismatch` | 422 | RN-16 |
+| `data-integrity-violation` | 422 | Outra violação de constraint no banco (FK `23503`, CHECK `23514`, NOT NULL `23502`) não tratada pela aplicação — rede de segurança (D-011) |
 | `stock-service-unavailable` | 503 | Circuit breaker aberto / timeout |
 | `internal-error` | 500 | Não mapeado (detalhe genérico; stack só no log) |
 

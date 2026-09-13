@@ -44,6 +44,9 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-006](#d-006--usuário-de-auditoria-armazena-preferred_username) | 2026-09-12 | Usuário de auditoria armazena `preferred_username` | aceita | — |
 | [D-007](#d-007--repositório-público-contém-código-readme-e-documentação-de-arquitetura-especificação-e-config-do-agente-ficam-locais) | 2026-09-12 | Repositório público: código, README e docs de arquitetura; especificação e config do agente locais | revogada | — |
 | [D-008](#d-008--versões-da-plataforma-spring-boot-41-java-21-groupid-develiascostainvoice) | 2026-09-13 | Versões da plataforma: Spring Boot 4.1, Java 21, `groupId` `dev.eliascosta.invoice` | aceita | ADR-001 |
+| [D-009](#d-009--subclasse-genérica-invalidrequestexception-400-na-hierarquia-de-erros-do-common) | 2026-09-13 | Subclasse genérica `InvalidRequestException` (400) na hierarquia de erros do `common` | aceita | ADR-014 |
+| [D-010](#d-010--origem-do-traceid-no-problemdetail-antes-do-tracing-distribuído) | 2026-09-13 | Origem do `traceId` no `ProblemDetail` antes do tracing distribuído | aceita | ADR-014 |
+| [D-011](#d-011--erros-fora-do-catálogo-88-violação-de-integridade-e-erros-de-protocolo-http) | 2026-09-13 | Erros fora do catálogo §8.8: violação de integridade e erros de protocolo HTTP | aceita | ADR-014 |
 
 ---
 
@@ -168,4 +171,46 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Y-statement**: No contexto do bootstrap de um portfólio em 2026-09, diante do fim do suporte OSS do Spring Boot 3.5 e da premissa de fixar a última estável compatível, decidimos Spring Boot 4.1.1 + Java 21 + `dev.eliascosta.invoice` para maximizar suporte e sinal de atualidade, aceitando a atualização dos documentos e as diferenças de API da geração 4.
 - **Documentos afetados**: `requisitos.md` §1 (tabela de capa), §2.6 C1, §8.1, §14 ADR-001 (atualizados em 2026-09-13 após confirmação) · `AGENTS.md` (descrição) · `.claude/rules/backend-java.md` (título) · `docs/adr/0001-versoes-da-plataforma.md` (criado)
 - **ADR**: ADR-001
+- **Substitui**: —
+
+### D-009 — Subclasse genérica `InvalidRequestException` (400) na hierarquia de erros do `common`
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: F1-02 define a hierarquia `DomainException` + subclasses genéricas previstas na Entrega (`NotFoundException` 404, `ConflictException` 409, `InvalidStateException` 409, `BusinessRuleException` 422, `UpstreamUnavailableException` 503); o status HTTP é decidido pelo `@RestControllerAdvice` a partir da subclasse, e o domínio não conhece HTTP. O catálogo `requisitos.md` §8.8 tem dois erros **400** que nascem de regra de negócio, não de Bean Validation (`field-immutable` — tentativa de alterar `code`/`document`; `duplicate-invoice-item` — RN-08), e nenhuma subclasse prevista mapeia para 400.
+- **Opções consideradas**: 1) sexta subclasse `InvalidRequestException` → 400 — catálogo coberto, status continua só no advice; custo: uma classe além da Entrega; 2) manter as cinco e tratar esses casos como `validation-error` via constraints customizadas — sem classe nova, mas os slugs `field-immutable`/`duplicate-invoice-item` deixariam de existir (revogar linhas do catálogo); 3) `DomainException` carrega o status HTTP (`int`) — qualquer serviço define qualquer status sem subclasse, mas conhecimento HTTP entra no domínio, contra a arquitetura hexagonal.
+- **Decisão**: (1). Hierarquia fechada com seis subclasses genéricas; o mapa classe → status vive exclusivamente em `ProblemDetailExceptionHandler`. As exceções específicas dos serviços (`ProductCodeAlreadyExistsException`, `InvalidInvoiceStatusException`, …) estendem a subclasse genérica correspondente e informam o slug do catálogo; `field-immutable` (F1-09/F1-17) e `duplicate-invoice-item` (F1-19) estenderão `InvalidRequestException`.
+- **Consequências**: + todas as linhas do catálogo §8.8 têm uma subclasse genérica correspondente; + domínio sem dependência de HTTP; − uma classe além da Entrega original de F1-02.
+- **Y-statement**: No contexto do catálogo de erros RFC 9457, diante de erros 400 que não vêm de Bean Validation, decidimos adicionar `InvalidRequestException` à hierarquia genérica para manter o status HTTP fora do domínio, aceitando uma subclasse a mais.
+- **Documentos afetados**: — (§8.8 já prevê os slugs) · plano F1-02 (Entrega ampliada, registrada no campo **Registro**)
+- **ADR**: ADR-014 (a escrever na F2, deve incorporar esta decisão)
+- **Substitui**: —
+
+### D-010 — Origem do `traceId` no `ProblemDetail` antes do tracing distribuído
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: `requisitos.md` §8.8 e RNF-OBS-05 exigem `traceId` em todo `ProblemDetail` (RF-RES-01 CA2 o exibe na UI). Micrometer Tracing só entra em F2-08 e o gateway só passa a emitir `X-Trace-Id` em F1-22; F1-02 precisava definir de onde o advice obtém o valor nesta fase.
+- **Opções consideradas**: 1) MDC `traceId` → header `X-Trace-Id` da requisição → omitir a propriedade — nunca inventa valor, F2-08 encaixa sem alterar o advice; 2) gerar um UUID por erro quando não houver — sempre presente, mas não correlaciona com log/trace nenhum (sinal falso); 3) omitir até F2-08 — mais simples, mas RF-RES-01 CA2 e RNF-OBS-05 sem base até a F2.
+- **Decisão**: (1), via `TraceIdResolver` no módulo `common`: lê a chave `traceId` do MDC (que o Micrometer Tracing popula em F2-08), senão o header `X-Trace-Id` da requisição (F1-22), senão a propriedade `traceId` é omitida do `ProblemDetail`.
+- **Consequências**: + F2-08 não altera o advice; + correlação via header já funciona a partir de F1-22; − até F1-22, respostas obtidas diretamente dos serviços (sem gateway) não trazem `traceId`.
+- **Y-statement**: No contexto de um `ProblemDetail` que deve trazer `traceId` antes de existir tracing, diante do risco de inventar um valor sem correlação, decidimos resolver MDC → header → ausente para que a propriedade só apareça quando tiver significado, aceitando sua ausência temporária fora do gateway.
+- **Documentos afetados**: —
+- **ADR**: ADR-014
+- **Substitui**: —
+
+### D-011 — Erros fora do catálogo §8.8: violação de integridade e erros de protocolo HTTP
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a Entrega de F1-02 manda mapear `DataIntegrityViolationException` → 409/422, mas o catálogo §8.8 não tinha slug para violação de constraint de banco não tratada pela aplicação (é rede de segurança: unicidade deve ser detectada antes e virar a `ConflictException` específica — `product-code-already-exists`, `customer-document-already-exists`). Além disso, o `ResponseEntityExceptionHandler` do Spring já trata erros de protocolo HTTP (404 sem rota, 405, 406, 415) que também não estão no catálogo.
+- **Opções consideradas** — integridade: 1) dois slugs novos discriminados por SQLState PostgreSQL (`unique-constraint-violation` 409 para `23505`; `data-integrity-violation` 422 para `23503`/`23514`/`23502` e demais); 2) um slug `data-integrity-violation` com dois status (contra a prática do RFC 9457); 3) sempre 409 sem inspecionar SQLState (violação de CHECK apareceria como conflito). Protocolo: a) manter o `ProblemDetail` padrão do Spring (`type` `about:blank`, permitido pelo RFC 9457) enriquecido com `traceId`/`timestamp`; b) slug genérico `http-error`; c) mapear tudo para `validation-error` (semântica incorreta para 405/415).
+- **Decisão**: (1) + (a). Duas linhas adicionadas ao catálogo §8.8 (`unique-constraint-violation` 409, `data-integrity-violation` 422), com a observação de que são rede de segurança. Erros de protocolo mantêm o `ProblemDetail` do Spring com `about:blank`; erros 400 de **formato** tratados pelo `ResponseEntityExceptionHandler` (JSON ilegível, tipo de parâmetro errado, parâmetro obrigatório ausente) usam `validation-error`, como já previa a linha "Bean Validation / formato".
+- **Consequências**: + todo erro de banco não previsto tem status coerente com a causa; + o catálogo continua sendo a lista dos erros de negócio; − duas linhas novas em §8.8; − 405/415 respondem `about:blank` (o frontend trata por status, RF-RES-01).
+- **Y-statement**: No contexto de erros que escapam da aplicação (constraints de banco, protocolo HTTP), diante de um catálogo pensado para erros de negócio, decidimos discriminar violações de integridade por SQLState em dois slugs e manter o padrão do Spring para erros de protocolo, para dar status coerente sem inflar o catálogo, aceitando `about:blank` nesses casos raros.
+- **Documentos afetados**: `requisitos.md` §8.8 (duas linhas adicionadas em 2026-09-13 após confirmação)
+- **ADR**: ADR-014
 - **Substitui**: —
