@@ -50,6 +50,9 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-012](#d-012--escopo-da-idempotency-key-rota-é-o-path-real-da-requisição-não-o-padrão-do-handler) | 2026-09-13 | Escopo da `Idempotency-Key`: rota é o path real da requisição, não o padrão do handler | aceita | ADR-009 |
 | [D-013](#d-013--chave-de-idempotência-in_flight-órfã-permanece-409-até-expirar) | 2026-09-13 | Chave de idempotência `IN_FLIGHT` órfã permanece 409 até expirar | aceita | ADR-009 |
 | [D-014](#d-014--resposta-replayada-pela-idempotência-é-o-mesmo-documento-json-não-os-mesmos-bytes) | 2026-09-13 | Resposta replayada pela idempotência é o mesmo documento JSON, não os mesmos bytes | aceita | ADR-009 |
+| [D-015](#d-015--evento-da-outbox-é-abandonado-após-n-falhas-definitivas-de-publicação-coluna-failed_at) | 2026-09-13 | Evento da outbox é abandonado após N falhas definitivas de publicação (coluna `failed_at`) | aceita | ADR-007 |
+| [D-016](#d-016--businessruleexception-em-listener-kafka-não-retentável-vai-direto-ao-dlt) | 2026-09-13 | `BusinessRuleException` em listener Kafka: não-retentável, vai direto ao DLT | aceita | ADR-006 |
+| [D-017](#d-017--tópicos-kafka-criados-pelo-kafkaadmin-a-partir-de-invoicekafkatopics) | 2026-09-13 | Tópicos Kafka criados pelo `KafkaAdmin` a partir de `invoice.kafka.topics` | aceita | ADR-006 |
 
 ---
 
@@ -258,4 +261,46 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Y-statement**: No contexto do replay de respostas armazenadas em `jsonb`, diante da renormalização feita pelo PostgreSQL, decidimos definir "mesma resposta" como igualdade de documento JSON para manter o schema documentado, aceitando que bytes, ordem de chaves e espaçamento possam diferir.
 - **Documentos afetados**: — (RN-16 permanece válida com esta leitura)
 - **ADR**: ADR-009 (idempotência) deve registrar esta nuance
+- **Substitui**: —
+
+### D-015 — Evento da outbox é abandonado após N falhas definitivas de publicação (coluna `failed_at`)
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: humano (contra a recomendação do agente na primeira opção; detalhamento proposto pelo agente)
+- **Contexto**: F1-04 implementa o `OutboxPublisher` (RNF-ARC-05, §8.11). `modelo-de-dados.md` §6.1 prevê `attempts` e `last_error`, mas nenhum documento fixa limite de tentativas nem o que acontece com um evento cuja publicação falha repetidamente; o schema de A.3 não tinha estado terminal. Com o poller a 500 ms e o lote interrompido na primeira falha (para preservar a ordem por chave exigida em §8.7), uma linha que nunca publica bloquearia as seguintes indefinidamente; por outro lado, o cliente Kafka distingue erros transitórios (`RetriableException`, timeout de ack — broker fora, líder em eleição) de erros definitivos (`RecordTooLargeException`, `InvalidTopicException`, autorização), e abandonar eventos durante uma queda do broker anularia a garantia da outbox (RNF-RES-05).
+- **Opções consideradas**: 1) retentar para sempre — sem mudança de schema, nenhum evento perdido, visibilidade por `attempts`/`last_error`/métrica (recomendação inicial do agente); custo: uma falha permanente bloqueia a fila até intervenção manual; 2) desistir após N falhas de qualquer natureza — simples, mas uma queda do Kafka de ≈ N × timeout descarta eventos; 3) desistir após N falhas **definitivas** (não-`RetriableException`, não-timeout), marcando a linha com coluna nova `failed_at`; falhas transitórias incrementam `attempts`/`last_error` mas nunca abandonam; 4) sem coluna, abandono implícito por `attempts >= max` — estado invisível e sensível a mudança de configuração.
+- **Decisão**: (3). `outbox_events` ganha `failed_at timestamptz NULL` e `ck_outbox_events_terminal CHECK (published_at IS NULL OR failed_at IS NULL)`; o índice parcial passa a `WHERE published_at IS NULL AND failed_at IS NULL`. O poller só enxerga linhas com ambos nulos; após `invoice.outbox.publisher.max-attempts` (padrão **5**, simétrico a RNF-RES-02) falhas cuja última causa é definitiva, grava `failed_at` e segue para a próxima linha. Métricas: `outbox_pending_events` (ignora abandonados) e `outbox_failed_events`. Reprocessamento é manual: `UPDATE outbox_events SET failed_at = NULL, attempts = 0 WHERE id = …`. Linhas abandonadas não são removidas pelo job de limpeza (evidência para diagnóstico).
+- **Consequências**: + a fila nunca fica presa por um evento impublicável; + indisponibilidade do broker continua sem perda; + estado explícito, consultável e observável. − uma coluna, uma constraint e um índice alterados em A.3 (F1-06/F1-14 usam a DDL atualizada); − classificação de erro depende da hierarquia do cliente Kafka (erro não classificado como `RetriableException` conta como definitivo); − reprocessar exige SQL manual (endpoint administrativo fica como evolução).
+- **Y-statement**: No contexto do poller da outbox, diante de eventos que nunca poderão ser publicados versus quedas transitórias do broker, decidimos abandonar um evento apenas após N falhas definitivas, marcando-o em `failed_at`, para nunca travar a fila nem perder eventos numa indisponibilidade, aceitando uma coluna a mais e o reprocessamento manual.
+- **Documentos afetados**: `modelo-de-dados.md` §6.1, §12, Apêndice A.3 · `requisitos.md` §8.11, RNF-OBS-03 (atualizados em 2026-09-13 após confirmação)
+- **ADR**: ADR-007 (outbox com poller) deve incorporar esta decisão ao ser escrito
+- **Substitui**: —
+
+### D-016 — `BusinessRuleException` em listener Kafka: não-retentável, vai direto ao DLT
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: `requisitos.md` §8.11 diz que `BusinessRuleException` é marcada como *not retryable* no `DefaultErrorHandler` — no Spring Kafka isso significa pular o backoff e entregar imediatamente ao recoverer (DLT). RNF-RES-02 diz que "exceções de negócio não vão para DLT — geram evento `rejected`". As duas frases descrevem camadas diferentes: o consumidor (F1-11/F1-20) trata a regra de negócio e grava o evento `rejected` na outbox, então a exceção nunca deveria chegar ao error handler; faltava definir o que acontece se chegar.
+- **Opções consideradas**: 1) `addNotRetryableExceptions(BusinessRuleException.class)` → uma tentativa → `<topic>.DLT` — leitura literal de §8.11, visibilidade em caso de bug; 2) recoverer customizado que só loga e confirma o offset — leitura literal de RNF-RES-02, mas um bug no consumidor perde o evento sem rastro além do log; 3) tratar como qualquer exceção (5 tentativas + DLT) — contraria §8.11 e desperdiça ≈ 15 s de backoff numa exceção determinística.
+- **Decisão**: (1). Regra para os consumidores: capturar a regra de negócio dentro do use case e produzir `rejected`; `BusinessRuleException` que escapa é bug e aparece no DLT sem retentativas. RNF-RES-02 permanece válido nessa leitura.
+- **Consequências**: + sem perda silenciosa; + sem backoff inútil. − o DLT pode receber eventos que, a rigor, deveriam ter virado `rejected` — sinal de bug a corrigir.
+- **Y-statement**: No contexto do tratamento de erros dos consumidores, diante da ambiguidade entre "não-retentável" e "não vai para DLT", decidimos enviar exceções de negócio que escapem diretamente ao DLT para ter visibilidade de bugs, aceitando que o DLT sirva também como alarme de consumidor mal implementado.
+- **Documentos afetados**: — (RNF-RES-02 e §8.11 permanecem válidos com esta leitura)
+- **ADR**: ADR-006 (Kafka) deve registrar esta nuance
+- **Substitui**: —
+
+### D-017 — Tópicos Kafka criados pelo `KafkaAdmin` a partir de `invoice.kafka.topics`
+
+- **Data**: 2026-09-13
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: `requisitos.md` §8.7 fixa 3 partições para `stock.debit-*` e 1 para `*.DLT`; sem criação explícita o broker auto-cria com 1 partição. A Entrega de F1-04 cita `KafkaAdmin` na configuração base, mas não dizia onde os tópicos são declarados.
+- **Opções consideradas**: 1) lista em propriedades no `common` (`invoice.kafka.topics[].{name,partitions}` + `invoice.kafka.dead-letter.partitions`) convertida em bean `NewTopics`; cada serviço declara no `application.yml`; 2) beans `NewTopic` em cada serviço (F1-11/F1-20) — duplicação e sem teste em F1-04; 3) container de init no Compose — ITs e execução local sem os tópicos corretos.
+- **Decisão**: (1). Para cada tópico listado o `KafkaAdmin` do Boot cria `<name>` com as partições indicadas e `<name>.DLT` com `dead-letter.partitions` (padrão 1); criação é idempotente (só cria o que falta), então ambos os serviços podem declarar a lista completa. Fator de replicação fica no padrão do broker (1 no Compose).
+- **Consequências**: + declarativo e testado no IT do `common`; + F1-06/F1-14 só precisam de YAML. − mais uma propriedade a documentar; − `KafkaAdmin` com `fail-fast=false` (padrão) apenas avisa se o broker estiver fora na subida (RNF-RES-05) e cria os tópicos na próxima oportunidade.
+- **Y-statement**: No contexto da criação dos tópicos com o número de partições do contrato, diante de auto-criação com 1 partição, decidimos declará-los por propriedade no `common` e deixar o `KafkaAdmin` criá-los para manter contrato e código no mesmo lugar, aceitando uma propriedade adicional.
+- **Documentos afetados**: —
+- **ADR**: ADR-006
 - **Substitui**: —

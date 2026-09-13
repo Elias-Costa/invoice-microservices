@@ -657,7 +657,7 @@ Teste automatizado reproduz o cenário com dois threads e `CountDownLatch` sobre
 |---|---|
 | RNF-OBS-01 | Logs estruturados em JSON (Logstash encoder) com `traceId`, `spanId`, `service`, `userId` (quando autenticado) via MDC. |
 | RNF-OBS-02 | Tracing distribuído com Micrometer Tracing (Brave) exportado para Zipkin; contexto W3C `traceparent` propagado via HTTP (gateway → serviços) e headers Kafka (produtor → consumidor). Um fechamento de nota aparece como um único trace ponta a ponta. |
-| RNF-OBS-03 | Métricas Micrometer expostas em `/actuator/prometheus`: JVM, HTTP server/client, Kafka consumer/producer, HikariCP, Resilience4j, e métricas de negócio: `invoices_created_total`, `invoices_closed_total`, `stock_debit_rejected_total{reason}`, `outbox_pending_events`. |
+| RNF-OBS-03 | Métricas Micrometer expostas em `/actuator/prometheus`: JVM, HTTP server/client, Kafka consumer/producer, HikariCP, Resilience4j, e métricas de negócio: `invoices_created_total`, `invoices_closed_total`, `stock_debit_rejected_total{reason}`, `outbox_pending_events`, `outbox_failed_events`. |
 | RNF-OBS-04 | Grafana provisionado com datasource Prometheus e dashboard "invoice-microservices" (latência HTTP, taxa de erro, estado do circuit breaker, lag do consumidor, métricas de negócio). |
 | RNF-OBS-05 | `traceId` retornado ao cliente em toda resposta (header `X-Trace-Id`) e incluído no `ProblemDetail`. |
 
@@ -1058,7 +1058,7 @@ resilience4j:
 
 - Cliente HTTP: `RestClient` com interceptor de client credentials (`OAuth2AuthorizedClientManager`) e `@CircuitBreaker/@Retry/@TimeLimiter`.
 - Kafka: `DefaultErrorHandler(DeadLetterPublishingRecoverer, ExponentialBackOff(1s, 2.0, maxAttempts 5))`; `BusinessRuleException` marcada como *not retryable*.
-- Outbox poller: `@Scheduled(fixedDelay = 500ms)`, `SELECT … FOR UPDATE SKIP LOCKED LIMIT 100`, publica com `acks=all`, `enable.idempotence=true`.
+- Outbox poller: `@Scheduled(fixedDelay = 500ms)`, `SELECT … FOR UPDATE SKIP LOCKED LIMIT 100`, publica com `acks=all`, `enable.idempotence=true`; lote interrompido na primeira falha (ordem por chave); abandona o evento após 5 falhas definitivas (`failed_at`, D-015).
 
 ### 8.12 Observabilidade — configuração
 

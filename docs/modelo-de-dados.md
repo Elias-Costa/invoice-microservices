@@ -562,7 +562,7 @@ Presentes com **DDL idêntico** nos dois bancos (cada serviço mantém as suas).
 
 ### 6.1 `outbox_events`
 
-Outbox transacional (ADR-007). Gravada na mesma transação da mudança de estado; publicada por poller (`@Scheduled`, 500 ms, `FOR UPDATE SKIP LOCKED`, lote 100).
+Outbox transacional (ADR-007). Gravada na mesma transação da mudança de estado; publicada por poller (`@Scheduled`, 500 ms, `FOR UPDATE SKIP LOCKED`, lote 100). Falhas de publicação incrementam `attempts`/`last_error`; após `max-attempts` (5) falhas **definitivas** (erro que não é `RetriableException` nem timeout) o evento é abandonado em `failed_at` e deixa de bloquear a fila (D-015). Reprocessar: `UPDATE outbox_events SET failed_at = NULL, attempts = 0 WHERE id = …`.
 
 | Coluna | Tipo | Null | Default | Descrição |
 |---|---|---|---|---|
@@ -578,8 +578,11 @@ Outbox transacional (ADR-007). Gravada na mesma transação da mudança de estad
 | `last_error` | `text` | sim | — | Última falha de publicação |
 | `created_at` | `timestamptz` | não | `now()` | |
 | `published_at` | `timestamptz` | sim | — | Nulo = pendente |
+| `failed_at` | `timestamptz` | sim | — | Abandonado após `max-attempts` falhas definitivas (D-015); nulo = elegível para publicação |
 
-**Índices**: `ix_outbox_events_pending (created_at) WHERE published_at IS NULL` (parcial — o poller só enxerga pendentes); `ix_outbox_events_aggregate (aggregate_type, aggregate_id)` para diagnóstico.
+**Índices**: `ix_outbox_events_pending (created_at) WHERE published_at IS NULL AND failed_at IS NULL` (parcial — o poller só enxerga pendentes); `ix_outbox_events_aggregate (aggregate_type, aggregate_id)` para diagnóstico.
+
+**Constraint**: `ck_outbox_events_terminal CHECK (published_at IS NULL OR failed_at IS NULL)` — um evento nunca é publicado *e* abandonado.
 
 ### 6.2 `processed_events`
 
@@ -794,7 +797,7 @@ O projeto é demonstrativo, mas o modelo é dimensionado para um cenário realis
 | Tabela | Política | Mecanismo |
 |---|---|---|
 | `idempotency_keys` | Remover `expires_at < now()` | Job diário (`@Scheduled`, 03:00) — `DELETE … LIMIT` em lotes |
-| `outbox_events` | Remover publicados há mais de 7 dias | Job diário |
+| `outbox_events` | Remover publicados há mais de 7 dias; abandonados (`failed_at`) não são removidos automaticamente (D-015) | Job diário |
 | `processed_events` | Remover processados há mais de 30 dias | Job diário — define a janela de deduplicação; eventos mais antigos que isso, se reentregues, seriam barrados por `invoice_debits`/`ux_*` |
 | `stock_movements`, `invoice_status_history`, `invoice_debits` | Nunca apagar (auditoria) | — |
 | `products`, `customers`, `invoices`, `invoice_items` | Nunca apagar | — |
@@ -1120,12 +1123,14 @@ CREATE TABLE outbox_events (
     last_error      text,
     created_at      timestamptz   NOT NULL DEFAULT now(),
     published_at    timestamptz,
-    CONSTRAINT pk_outbox_events PRIMARY KEY (id)
+    failed_at       timestamptz,
+    CONSTRAINT pk_outbox_events PRIMARY KEY (id),
+    CONSTRAINT ck_outbox_events_terminal CHECK (published_at IS NULL OR failed_at IS NULL)
 );
-CREATE INDEX ix_outbox_events_pending   ON outbox_events (created_at) WHERE published_at IS NULL;
+CREATE INDEX ix_outbox_events_pending   ON outbox_events (created_at) WHERE published_at IS NULL AND failed_at IS NULL;
 CREATE INDEX ix_outbox_events_aggregate ON outbox_events (aggregate_type, aggregate_id);
 
-COMMENT ON TABLE outbox_events IS 'Outbox transacional: eventos a publicar no Kafka (published_at IS NULL = pendente)';
+COMMENT ON TABLE outbox_events IS 'Outbox transacional: eventos a publicar no Kafka (published_at IS NULL AND failed_at IS NULL = pendente; failed_at = abandonado após falhas definitivas)';
 
 CREATE TABLE processed_events (
     event_id        uuid          NOT NULL,
