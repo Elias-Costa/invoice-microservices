@@ -4,11 +4,12 @@ Sistema de emissão de notas fiscais em microsserviços: Java 21 + Spring Boot 4
 
 ## Papéis e fonte da verdade
 
-- **Você implementa; o humano revisa e faz commit.** Você nunca executa `git commit`, `git push`, `git add` ou qualquer comando que altere índice, histórico, branches ou remoto (bloqueado por hook).
+- **Você implementa; o humano revisa e faz commit.** Você nunca executa `git commit`, `git push`, `git add` ou qualquer comando que altere índice, histórico, branches ou remoto. Cada agente tem seu próprio bloqueio local de Git.
 - **Fonte da verdade**, em ordem: instruções do humano na conversa → `docs/decisions.md` → `docs/requisitos.md` e `docs/modelo-de-dados.md` → código existente. Documento vence código.
 - **Se algo necessário não está explícito nos documentos, PARE e pergunte.** Não suponha, não "melhore" o escopo. Após a resposta, registre em `docs/decisions.md` (formato no próprio arquivo) e só então continue. Agrupe as perguntas na fase de planejamento sempre que possível.
 - Leia `docs/decisions.md` no início de toda tarefa; as decisões mais recentes prevalecem.
 - **Plano de implementação**: `.claude/plano-de-implementacao.md` (local, não versionado). Toda tarefa tem um ID (`F1-07`), status, dependências, escopo (**Entrega**) e **Verificação**. Ao iniciar, mude o status para `em andamento`; ao entregar o relatório, para `em revisão` e preencha **Registro**; `concluída` só quando o humano informar o commit. Não implemente nada fora do campo **Entrega** sem registro em `decisions.md`.
+- **Uso alternado**. O humano usa Claude Code ou Codex, um por vez, no mesmo checkout. Na troca durante uma tarefa, o agente que está saindo anota no **Registro** os arquivos em andamento, as verificações realizadas e as decisões pendentes. O próximo assume quando o humano indicar a troca, lê o plano e confere as alterações existentes com `git status --short` antes de editar.
 - Processo completo e justificativas: `docs/guia-trabalho-com-agente.md`.
 
 ## Comandos
@@ -50,7 +51,13 @@ e2e/                                                         # Playwright
 docs/{requisitos.md,modelo-de-dados.md,decisions.md,adr/,architecture/,api/}
 ```
 
-Detalhes por área carregam automaticamente de `.claude/rules/` ao tocar `backend/**`, `frontend/**` ou `docs/**`.
+O Claude Code carrega as regras por área automaticamente. Antes de editar, o Codex abre os mesmos arquivos conforme o escopo da tarefa.
+
+| Escopo | Regras |
+|---|---|
+| `backend/**` | `.claude/rules/backend-java.md` |
+| `frontend/**` e `e2e/**` | `.claude/rules/frontend-angular.md` |
+| `docs/**` e Markdown na raiz | `.claude/rules/docs.md` |
 
 ## Convenções que diferem do padrão
 
@@ -70,7 +77,7 @@ Detalhes por área carregam automaticamente de `.claude/rules/` ao tocar `backen
 
 - Você não faz commit. Ao terminar, deixe a árvore de trabalho pronta para revisão e descreva no relatório como ela deve ser commitada (escopo sugerido e mensagem em Conventional Commits: `feat(stock): …`, `fix(billing): …`, `docs: …`, `chore(infra): …`, `test(billing): …`).
 - Não crie, troque ou apague branches. Não altere `.git/`.
-- **Não versionados** (`.gitignore`): `.claude/` (configuração da ferramenta) e `docs/escopo.pdf`. Nunca os inclua no commit sugerido. `AGENTS.md`, `CLAUDE.md` e todo o restante de `docs/` **são** versionados e públicos — escreva-os como parte do portfólio.
+- **Não versionados** (`.gitignore`): `.claude/`, `.codex/`, `.agents/skills/` e `docs/escopo.pdf`. Nunca os inclua no commit sugerido. `AGENTS.md`, `CLAUDE.md` e todo o restante de `docs/` **são** versionados e públicos — escreva-os como parte do portfólio.
 
 ## Limites
 

@@ -778,7 +778,7 @@ invoice-microservices/
     └── api/                    # openapi-*.yaml, asyncapi.yaml
 ```
 
-Apenas `.claude/` (configuração local da ferramenta: hooks, permissões, rules, skills) e `docs/escopo.pdf` não são versionados.
+As configurações dos agentes (`.claude/`, `.codex/` e `.agents/skills/`) e `docs/escopo.pdf` ficam locais, com exclusões no `.gitignore` (D-022).
 
 O módulo `common` contém apenas código de infraestrutura compartilhada (sem domínio) para evitar acoplamento entre serviços.
 

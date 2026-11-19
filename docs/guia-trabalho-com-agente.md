@@ -5,7 +5,7 @@
 | Projeto | `invoice-microservices` |
 | Versão | 1.0 |
 | Data | 2026-09-12 |
-| Finalidade | Registrar as práticas pesquisadas para desenvolvimento com agente de IA (Claude Code), as decisões de processo adotadas e a justificativa de cada arquivo de configuração do repositório |
+| Finalidade | Registrar as práticas de desenvolvimento com Claude Code e Codex, as decisões de processo adotadas e a função de cada arquivo de configuração do repositório |
 
 ---
 
@@ -14,7 +14,7 @@
 | Papel | Responsabilidade |
 |---|---|
 | **Humano** (autor do projeto) | Define requisitos, decide trade-offs, revisa cada entrega, faz `git add`/`commit`/`push`, gerencia branches e releases |
-| **Agente** (Claude Code) | Lê a fonte da verdade, planeja, implementa, testa, apresenta evidências, registra decisões, **para e pergunta** quando algo não está explícito |
+| **Agente** (Claude Code ou Codex) | Lê a fonte da verdade, planeja, implementa, testa, apresenta evidências, registra decisões, **para e pergunta** quando algo não está explícito |
 
 **Fonte da verdade**, em ordem de precedência:
 
@@ -30,7 +30,7 @@ Se código e documento divergirem, o documento está certo até que uma decisão
 Quando, durante uma tarefa, o agente precisa de uma informação que **não está explícita** nos documentos (ou encontra contradição entre eles):
 
 1. **Não supõe.** Interrompe a implementação daquele ponto.
-2. **Pergunta** com a ferramenta `AskUserQuestion`: contexto em 2–3 linhas, 2–4 opções com prós/contras, recomendação marcada.
+2. **Pergunta** na ferramenta disponível no chat. No Claude Code, use `AskUserQuestion`. Explique o contexto em 2–3 linhas, apresente as opções com prós e contras e indique a recomendação. Aguarde a resposta.
 3. **Registra** a resposta em `docs/decisions.md` (entrada `D-nnn`) antes de continuar.
 4. **Propõe a alteração** em `requisitos.md`/`modelo-de-dados.md` se a decisão os afeta; aplica após confirmação.
 5. **Continua** a implementação com a decisão tomada.
@@ -55,7 +55,7 @@ Explorar → Planejar → (Perguntar) → Implementar → Verificar → Relatar 
 | Revisão | Humano lê o diff e o relatório; pede ajustes ou aprova |
 | Commit | Humano faz `git add`/`commit` (Conventional Commits) |
 
-Uma tarefa por sessão (ou `/clear` entre tarefas): contexto limpo melhora a qualidade.
+Use um agente por vez e uma tarefa por sessão (D-023). Claude Code e Codex consultam e atualizam o mesmo `.claude/plano-de-implementacao.md`. Ao trocar de agente durante uma tarefa, o humano indica a passagem e o agente atual anota no **Registro** os arquivos em andamento, as verificações executadas e as decisões pendentes. O próximo agente lê o registro e inspeciona a árvore de trabalho antes de editar.
 
 ---
 
@@ -151,10 +151,20 @@ Avaliação de Kiro, Spec-kit e Tessl (Martin Fowler, artigo de Birgitta Böckel
 | `.claude/hooks/block-git-write.sh` | Bloqueio determinístico de comandos git/gh que alteram índice, histórico, branches ou remoto | A cada `Bash`/`PowerShell` |
 | `.claude/skills/tarefa/SKILL.md` | Workflow `/tarefa <descrição>`: ciclo completo de uma tarefa | Sob demanda |
 | `.claude/skills/decisao/SKILL.md` | Workflow `/decisao <tema>`: registra uma decisão em `decisions.md` | Sob demanda |
+| `.codex/config.toml` | Ativa hooks e define `GIT_OPTIONAL_LOCKS=0` nos comandos do Codex para evitar gravações opcionais do Git durante leituras | Projeto confiável no Codex |
+| `.codex/rules/git.rules` | Bloqueia prefixos comuns de escrita Git e GitHub pela política de execução do Codex | Projeto confiável no Codex |
+| `.codex/hooks.json` | Registra o hook `PreToolUse` do Codex para a ferramenta de shell | Após revisar e confiar no hook |
+| `.codex/hooks/block-git-write.cjs` | Confere os comandos de shell e cobre formas como `git -C`, `git.exe` e chamadas compostas | A cada comando de shell atendido pelo hook |
+| `.agents/skills/tarefa/SKILL.md` | Executa uma tarefa do plano compartilhado com `$tarefa <ID>` no Codex | Sob demanda |
+| `.agents/skills/decisao/SKILL.md` | Registra uma decisão com `$decisao <tema>` no Codex | Sob demanda |
 | `docs/decisions.md` | Registro corrente de decisões | Lido pelo agente no início de cada tarefa |
 | `CLAUDE.local.md` (opcional, ignorado pelo git) | Preferências pessoais da máquina | Toda sessão |
 
 Manutenção: `AGENTS.md` cresce **uma linha por erro recorrente** do agente; revisar a cada fase; remover o que o agente já faz certo sem instrução.
+
+### 3.1 Ativação local do Codex
+
+Abra este checkout como projeto local confiável no Codex, com Git e Node.js no `PATH`. Inicie uma sessão nova após alterações na configuração. Revise e autorize o hook do projeto em `/hooks` no Codex CLI. Um hook novo ou alterado fica pendente até o aceite. O hook analisa comandos de shell visíveis ao Codex. Chamadas escondidas em aliases, scripts externos ou outros conectores continuam sujeitas às instruções de `AGENTS.md`. Use as skills no seletor `$` do Codex e confira o plano ao trocar de agente. [Documentação do Codex sobre hooks](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks) e [política de execução](https://learn.chatgpt.com/docs/agent-configuration/rules).
 
 ---
 

@@ -57,6 +57,8 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-019](#d-019--imagem-apachekafka-native421-com-healthcheck-por-probe-apiversions-e-volume-inicializado-por-kafka-init) | 2026-09-13 | Imagem `apache/kafka-native:4.2.1` com healthcheck por probe `ApiVersions` e volume inicializado por `kafka-init` | aceita | ADR-001 |
 | [D-020](#d-020--kafka-ui-ghcriokafbatkafka-uiv150-fork-mantido) | 2026-09-13 | Kafka UI: `ghcr.io/kafbat/kafka-ui:v1.5.0` (fork mantido) | aceita | ADR-001 |
 | [D-021](#d-021--role-de-aplicação-não-superusuário-por-banco-criada-por-script-de-init-variáveis-postgres_) | 2026-09-13 | Role de aplicação não-superusuário por banco, criada por script de init; variáveis `POSTGRES_*` | aceita | ADR-004 |
+| [D-022](#d-022--integração-local-do-codex-ao-fluxo-de-trabalho) | 2026-11-19 | Integração local do Codex ao fluxo de trabalho | aceita | — |
+| [D-023](#d-023--uso-alternado-de-claude-code-e-codex) | 2026-11-19 | Uso alternado de Claude Code e Codex | aceita | — |
 
 ---
 
@@ -363,4 +365,32 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Y-statement**: No contexto de dois bancos PostgreSQL em containers, diante da ausência de definição de usuários e variáveis, decidimos criar por script uma role de aplicação sem privilégios de superusuário por banco e padronizar `POSTGRES_*` com defaults no Compose, para menor privilégio e subida em um comando, aceitando um script e uma senha de superusuário compartilhada.
 - **Documentos afetados**: `requisitos.md` §8.3 (árvore `infra/postgres/`, atualizada em 2026-09-13 após confirmação)
 - **ADR**: ADR-004 (banco por serviço) pode registrar esta decisão ao ser escrito
+- **Substitui**: —
+
+### D-022 — Integração local do Codex ao fluxo de trabalho
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: o projeto já usa Claude Code com `AGENTS.md`, plano de implementação local e controle humano do Git (D-001 e D-004). O humano pediu uma configuração análoga para usar o Codex no mesmo repositório.
+- **Opções consideradas**: 1) configuração específica local, como a do Claude Code, exige configuração em cada clone; 2) configuração específica versionada, disponível a cada clone.
+- **Decisão**: (1). Abrir a tarefa F0-05 e manter a configuração em `.codex/` e `.agents/skills/`, ambas ignoradas pelo Git. Os agentes compartilham o plano, as instruções e o registro de decisões. O humano autorizou atualizar `requisitos.md` §8.3.
+- **Consequências**: + os agentes acompanham o mesmo estado das tarefas e mantêm configurações próprias; − outro clone precisa receber a configuração local separadamente.
+- **Y-statement**: No contexto do uso de dois agentes no mesmo repositório, diante do risco de duplicar regras e progresso, decidimos manter as configurações locais e compartilhar as instruções e o plano para facilitar a troca de agente, aceitando configurar cada clone.
+- **Documentos afetados**: `AGENTS.md` · `guia-trabalho-com-agente.md` · `requisitos.md` §8.3 · `.gitignore`
+- **ADR**: —
+- **Substitui**: —
+
+### D-023 — Uso alternado de Claude Code e Codex
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano
+- **Contexto**: após a integração local do Codex (D-022), o humano esclareceu como os dois agentes serão usados no mesmo checkout.
+- **Opções consideradas**: 1) uso alternado com passagem de contexto pelo plano; 2) trabalho simultâneo com coordenação de arquivos, como previa a primeira versão do guia.
+- **Decisão**: (1). O humano usa um agente por vez no repositório. Se trocar de agente durante uma tarefa, o próximo retoma a partir do plano compartilhado e inspeciona as alterações existentes antes de editar.
+- **Consequências**: + o plano precisa registrar a passagem de contexto entre sessões; − cada sessão de trabalho começa depois de encerrar a anterior.
+- **Y-statement**: No contexto de um checkout compartilhado, diante da necessidade de trocar de agente entre sessões, decidimos usar Claude Code e Codex em sequência para preservar a continuidade da tarefa, aceitando concluir a sessão atual antes de iniciar a próxima.
+- **Documentos afetados**: `AGENTS.md` · `guia-trabalho-com-agente.md` · plano local · skill local `$tarefa`
+- **ADR**: —
 - **Substitui**: —

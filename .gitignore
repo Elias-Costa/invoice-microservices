@@ -1,6 +1,8 @@
-# Configuração local da ferramenta de agente (settings, hooks, rules, skills)
+# Configuração local dos agentes (settings, hooks, rules, skills)
 .claude/
 CLAUDE.local.md
+/.codex/
+/.agents/skills/
 
 # Documento de escopo local (não versionado — requisitos.md §8.3)
 docs/escopo.pdf
