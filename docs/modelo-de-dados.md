@@ -107,7 +107,7 @@ Todas as tabelas de agregados possuem:
 
 Tabelas append-only (`stock_movements`, `invoice_status_history`, `processed_events`) têm apenas `created_*`/`*_at`.
 
-Na F1, as operações HTTP de produtos do Estoque registram `anonymous` na auditoria. No cadastro, o produto e a movimentação `INITIAL` recebem o mesmo autor.
+Na F1, as operações HTTP de produtos do Estoque e de clientes do Faturamento registram `anonymous` na auditoria. No cadastro de produto, o produto e a movimentação `INITIAL` recebem o mesmo autor.
 
 ### 2.6 Exclusão lógica
 

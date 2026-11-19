@@ -5,6 +5,7 @@ import dev.eliascosta.invoice.billing.domain.model.InvoiceStatus;
 import dev.eliascosta.invoice.billing.domain.port.PageResult;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,6 +16,8 @@ public interface InvoiceRepository {
   Invoice save(Invoice invoice);
 
   PageResult<Summary> search(Search query);
+
+  List<Summary> findRecentByCustomerId(UUID customerId, int limit);
 
   record Search(
       InvoiceStatus status,

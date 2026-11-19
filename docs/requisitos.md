@@ -296,11 +296,11 @@ Cada requisito traz prioridade (MoSCoW), fase de entrega e critérios de aceite 
 - CA3: Documento já cadastrado → `409` (`customer-document-already-exists`).
 - CA4: Na UI, máscara dinâmica CPF/CNPJ e validador customizado síncrono.
 
-**RF-CUS-02 — Listar clientes.** Paginação, busca por nome/documento, filtro ativo/inativo — mesmos padrões de RF-PRD-02.
+**RF-CUS-02 — Listar clientes.** Lista paginada e ordenável com filtro ativo/inativo. A busca aceita um trecho do nome sem distinção de maiúsculas e minúsculas ou um prefixo do documento cadastrado.
 
-**RF-CUS-03 — Consultar cliente.** Detalhe com dados cadastrais e lista das últimas notas do cliente.
+**RF-CUS-03 — Consultar cliente.** Detalhe com dados cadastrais e até cinco notas do cliente, de qualquer status, ordenadas da mais recente à mais antiga pela data de criação.
 
-**RF-CUS-04 — Editar cliente.** Todos os campos exceto `document` (imutável). Controle de versão otimista.
+**RF-CUS-04 — Editar cliente.** Permite alterar `name`, `email` e `phone` com controle de versão otimista. Se enviado no `PUT`, `document` deve coincidir com o valor cadastrado. A tentativa de alterar `document` ou o envio de `active` retorna `400 field-immutable`.
 
 **RF-CUS-05 — Inativar/reativar cliente.** `ADMIN`. Cliente inativo não pode receber novas notas (RN-20).
 
@@ -929,10 +929,10 @@ A listagem usa `active=true` por padrão e aceita ordenar por `code`, `descripti
 
 | Método | Rota | Perfis | IK | Sucesso | Descrição |
 |---|---|---|---|---|---|
-| GET | `/customers` | OPERATOR, ADMIN | | 200 | Lista paginada (`search`, `active`) |
+| GET | `/customers` | OPERATOR, ADMIN | | 200 | Lista paginada (`search`, `active`, `page`, `size`, `sort`) |
 | GET | `/customers/{id}` | OPERATOR, ADMIN | | 200 | Detalhe + últimas notas |
 | POST | `/customers` | OPERATOR, ADMIN | ✔ | 201 | Cria |
-| PUT | `/customers/{id}` | OPERATOR, ADMIN | | 200 | Edita (exceto `document`) |
+| PUT | `/customers/{id}` | OPERATOR, ADMIN | | 200 | Edita `name`, `email` e `phone` (envia `version`) |
 | DELETE | `/customers/{id}` | ADMIN | | 204 | Inativa |
 | POST | `/customers/{id}/reactivate` | ADMIN | | 200 | Reativa |
 | GET | `/invoices` | OPERATOR, ADMIN | | 200 | Lista paginada (`status`, `customerId`, `from`, `to`) |
@@ -944,6 +944,10 @@ A listagem usa `active=true` por padrão e aceita ordenar por `code`, `descripti
 | GET | `/invoices/{id}/pdf` | OPERATOR, ADMIN | | 200 | PDF (só `CLOSED`) |
 | GET | `/invoices/{id}/history` | OPERATOR, ADMIN | | 200 | Transições de status |
 | GET | `/actuator/health` | público | | 200 | Saúde |
+
+O `billing-service` expõe as rotas de clientes com o prefixo `/api/billing`, preservado pelo gateway. As respostas de cliente incluem `id`, `name`, `document`, `documentType`, `email`, `phone`, `active` e `version`. O detalhe inclui `recentInvoices` com `id`, `number`, `status`, `total` e `createdAt` por nota.
+
+A listagem de clientes usa `active=true` e `sort=name,asc` por padrão. Aceita ordenar por `name`, `document` ou `active`. Campo ou direção inválidos retornam `400 validation-error`.
 
 Convenções: paginação `page` (0-based), `size` (padrão 20, máx. 100), `sort=campo,asc|desc`; resposta `{content, page: {number, size, totalElements, totalPages}}`; ids UUID; datas ISO-8601 UTC; moeda como número decimal (string JSON não é usada).
 

@@ -101,6 +101,19 @@ class InvoicePersistenceAdapter implements InvoiceRepository {
         page.getContent(), page.getNumber(), page.getSize(), page.getTotalElements());
   }
 
+  @Override
+  public List<Summary> findRecentByCustomerId(UUID customerId, int limit) {
+    Specification<InvoiceJpaEntity> matchingCustomer =
+        (invoice, criteria, builder) -> builder.equal(invoice.get("customerId"), customerId);
+    return repository.findBy(
+        matchingCustomer,
+        rows ->
+            rows.as(Summary.class)
+                .sortBy(Sort.by(Direction.DESC, "createdAt", "number"))
+                .limit(limit)
+                .all());
+  }
+
   private static Sort sort(Search query) {
     if (query.sortBy() == null || query.sortBy().isBlank()) {
       return DEFAULT_SORT;

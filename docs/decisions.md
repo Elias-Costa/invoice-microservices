@@ -78,6 +78,10 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-040](#d-040--limite-dos-totais-de-item-e-de-nota) | 2026-11-19 | Limite dos totais de item e de nota | aceita | — |
 | [D-041](#d-041--mapstruct-e-testes-jpa-no-faturamento) | 2026-11-19 | MapStruct e testes JPA no Faturamento | aceita | — |
 | [D-042](#d-042--limites-do-filtro-por-período-das-notas) | 2026-11-19 | Limites do filtro por período das notas | aceita | — |
+| [D-043](#d-043--starter-de-testes-mvc-do-faturamento) | 2026-11-19 | Starter de testes MVC do Faturamento | aceita | — |
+| [D-044](#d-044--contrato-rest-e-auditoria-de-clientes-na-f1) | 2026-11-19 | Contrato REST e auditoria de clientes na F1 | aceita | — |
+| [D-045](#d-045--busca-e-ordenação-da-lista-de-clientes) | 2026-11-19 | Busca e ordenação da lista de clientes | aceita | — |
+| [D-046](#d-046--alinhamento-dos-documentos-ao-contrato-de-clientes) | 2026-11-19 | Alinhamento dos documentos ao contrato de clientes | aceita | — |
 
 ---
 
@@ -677,5 +681,61 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: períodos adjacentes podem compartilhar um limite sem duplicar as notas emitidas exatamente naquele instante.
 - **Y-statement**: no contexto da listagem de notas por data de criação, diante da possibilidade de consultas por períodos adjacentes, decidimos incluir o início e excluir o fim para permitir combinar intervalos sem repetir registros no limite.
 - **Documentos afetados**: `requisitos.md` RF-INV-02 e §8.6 · `modelo-de-dados.md` §5.3 (detalhamento registrado nesta decisão) · plano local de implementação (F1-16).
+- **ADR**: —
+- **Substitui**: —
+
+### D-043 — Starter de testes MVC do Faturamento
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-17 prevê testes `@WebMvcTest`. O Faturamento tem o starter base de testes. A D-030 já define o starter MVC para o Estoque.
+- **Opções consideradas**: reutilizar o starter da F1-09 no Faturamento ou rever a estratégia de testes para usar o contexto completo.
+- **Decisão**: declarar `spring-boot-starter-webmvc-test` no `billing-service`, em escopo `test` e com a versão gerenciada pelo BOM do Spring Boot.
+- **Consequências**: o módulo pode testar o contrato HTTP com um slice MVC e usar MockMvc nos testes de integração.
+- **Y-statement**: no contexto da API de clientes, diante da necessidade de testar seus status HTTP em um slice, decidimos usar o starter MVC já adotado pelo Estoque para manter a estratégia de testes consistente entre os serviços.
+- **Documentos afetados**: plano local de implementação (F1-17).
+- **ADR**: —
+- **Substitui**: —
+
+### D-044 — Contrato REST e auditoria de clientes na F1
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-CUS-01 a RF-CUS-05 e `requisitos.md` §8.6 descrevem as rotas de clientes. A F1 roda sem autenticação (D-029). Os campos das respostas, o comportamento do `PUT`, a autoria HTTP e o resumo das notas recentes precisavam de definição.
+- **Opções consideradas**: aplicar as convenções da API de produtos ao Faturamento e incluir um resumo limitado de notas no detalhe, ou especificar um formato próprio de rota e resposta.
+- **Decisão**: expor `/api/billing/customers` no serviço com o prefixo preservado pelo Gateway. Usar `anonymous` na auditoria HTTP da F1. As respostas de cliente incluem `id`, `name`, `document`, `documentType`, `email`, `phone`, `active` e `version`. O `PUT` recebe nome, e-mail, telefone e versão, aceita `document` igual ao cadastrado e retorna `400 field-immutable` para alteração de documento ou envio de `active`. O detalhe inclui `recentInvoices` com até cinco notas de qualquer status, da mais recente à mais antiga por `createdAt`, cada uma com `id`, `number`, `status`, `total` e `createdAt`.
+- **Consequências**: o consumidor recebe a versão atual e resumos suficientes para abrir as notas recentes. A inativação e a reativação usam as rotas dedicadas.
+- **Y-statement**: no contexto da API de clientes da F1, diante das lacunas no contrato, decidimos manter as convenções de rota e auditoria da API de produtos e explicitar as respostas de cliente para viabilizar a integração com o Gateway e a UI.
+- **Documentos afetados**: `requisitos.md` RF-CUS-03, RF-CUS-04 e §8.6 · `modelo-de-dados.md` §2.5 e §5.3 · plano local de implementação (F1-17 e F1-22).
+- **ADR**: —
+- **Substitui**: —
+
+### D-045 — Busca e ordenação da lista de clientes
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-CUS-02 remete aos padrões de busca de RF-PRD-02. `modelo-de-dados.md` §5.2 descreve a busca por documento como busca por prefixo. A lista de campos ordenáveis também precisava de definição.
+- **Opções consideradas**: buscar o documento por qualquer trecho, seguindo o padrão da busca de produtos, ou pelo prefixo definido no modelo de dados.
+- **Decisão**: buscar por trecho do nome sem distinção de maiúsculas e minúsculas ou por prefixo do documento. Usar `active=true` e `name,asc` por padrão. Permitir ordenar por `name`, `document` ou `active`.
+- **Consequências**: o consumidor pode digitar o início do CPF ou CNPJ, ou parte do nome, e paginar os resultados por estado de ativação.
+- **Y-statement**: no contexto da lista de clientes, diante de descrições diferentes para a busca, decidimos manter a busca por trecho no nome e adotar o prefixo no documento para aplicar a convenção registrada no modelo de dados.
+- **Documentos afetados**: `requisitos.md` RF-CUS-02 e §8.6 · `modelo-de-dados.md` §5.2 · plano local de implementação (F1-17).
+- **ADR**: —
+- **Substitui**: —
+
+### D-046 — Alinhamento dos documentos ao contrato de clientes
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: D-044 e D-045 definiram a busca, as respostas e a autoria HTTP na F1-17. Os documentos de referência descreviam esses pontos em termos gerais.
+- **Opções consideradas**: alinhar os dois documentos ou manter os detalhes no registro de decisões.
+- **Decisão**: atualizar `requisitos.md` e `modelo-de-dados.md` para refletir D-044 e D-045.
+- **Consequências**: a documentação da API inclui a busca, os campos das respostas e o comportamento da edição. O modelo de dados identifica a autoria das chamadas HTTP de clientes na F1.
+- **Y-statement**: no contexto da entrega da API de clientes, diante das lacunas dos documentos de referência, decidimos alinhá-los às decisões da F1-17 para documentar o contrato usado pelos consumidores.
+- **Documentos afetados**: `requisitos.md` RF-CUS-02 a RF-CUS-04 e §8.6 · `modelo-de-dados.md` §2.5.
 - **ADR**: —
 - **Substitui**: —
