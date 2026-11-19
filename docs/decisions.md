@@ -61,6 +61,8 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-023](#d-023--uso-alternado-de-claude-code-e-codex) | 2026-11-19 | Uso alternado de Claude Code e Codex | aceita | — |
 | [D-024](#d-024--shell-angular-antes-da-integração-com-o-gateway) | 2026-11-19 | Shell Angular antes da integração com o Gateway | aceita | ADR-001 |
 | [D-025](#d-025--dependências-maven-do-stock-service-na-f1-06) | 2026-11-19 | Dependências Maven do `stock-service` na F1-06 | aceita | — |
+| [D-026](#d-026--entrada-manual-em-produto-inativo) | 2026-11-19 | Entrada manual em produto inativo | aceita | — |
+| [D-027](#d-027--limite-de-saldo-na-entrada-manual) | 2026-11-19 | Limite de saldo na entrada manual | aceita | — |
 
 ---
 
@@ -422,5 +424,33 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: as versões do serviço seguem o BOM, os testes de arquitetura compartilham uma versão explícita do ArchUnit e o IT de subida usa as conexões fornecidas pelos containers. A F2 requer atualizar o POM e a configuração isolada de segurança.
 - **Y-statement**: No contexto do bootstrap do Estoque, diante da necessidade de validar a arquitetura e a aplicação das migrações, decidimos reutilizar as dependências gerenciadas e centralizar a versão do ArchUnit para manter o build reproduzível, aceitando atualizar a dependência de segurança na F2.
 - **Documentos afetados**: plano local de implementação (F1-06). `requisitos.md` §7.4, §8.4 e §8.10 permanecem aplicáveis.
+- **ADR**: —
+- **Substitui**: —
+
+### D-026 — Entrada manual em produto inativo
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RN-03 proíbe baixar o saldo de produtos inativos. RF-STK-01 prevê entradas e saídas manuais e deixa em aberto a situação de uma entrada em produto inativo.
+- **Opções consideradas**: 1) permitir entrada manual com o produto inativo; 2) exigir reativação antes de qualquer entrada.
+- **Decisão**: permitir `INBOUND` em produto inativo. A entrada mantém o estado de inativação e registra o novo saldo no histórico. `OUTBOUND` e `INVOICE_DEBIT` exigem produto ativo, conforme RN-03.
+- **Consequências**: o usuário pode repor o saldo sem reativar o produto. O saldo fica disponível para baixa após a reativação.
+- **Y-statement**: No contexto da reposição de estoque, diante de um produto inativo, decidimos permitir a entrada manual para registrar o saldo recebido, mantendo a restrição de baixa de RN-03.
+- **Documentos afetados**: plano local de implementação (F1-07). RF-STK-01 e RN-03 permanecem aplicáveis.
+- **ADR**: —
+- **Substitui**: —
+
+### D-027 — Limite de saldo na entrada manual
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: `modelo-de-dados.md` §2.3 e §4.2 adotam `integer` para o saldo. RF-STK-01 deixa em aberto como rejeitar uma entrada cujo saldo resultante exceda a capacidade desse tipo.
+- **Opções consideradas**: 1) usar `validation-error` (400), já previsto no catálogo; 2) definir um erro de negócio específico (422).
+- **Decisão**: rejeitar a entrada que elevaria o saldo acima de `2.147.483.647` com `validation-error`. O saldo permanece intacto e a operação não gera movimentação.
+- **Consequências**: a operação informa que a quantidade ultrapassa o limite e preserva o saldo e o histórico. A F1-10 usa o mapeamento existente do `common` para 400.
+- **Y-statement**: No contexto da entrada de estoque, diante do limite de `integer`, decidimos rejeitar a quantidade que exceda o saldo representável com `validation-error` para preservar a consistência do agregado e do histórico.
+- **Documentos afetados**: plano local de implementação (F1-07). `modelo-de-dados.md` §2.3 e §4.2 e o catálogo de `requisitos.md` §8.8 permanecem aplicáveis.
 - **ADR**: —
 - **Substitui**: —
