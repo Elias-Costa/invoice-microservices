@@ -73,6 +73,7 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-035](#d-035--motivos-e-detalhes-da-rejeição-de-baixa-por-nota) | 2026-11-19 | Motivos e detalhes da rejeição de baixa por nota | aceita | — |
 | [D-036](#d-036--nova-tentativa-para-nota-com-baixa-confirmada) | 2026-11-19 | Nova tentativa para nota com baixa confirmada | aceita | — |
 | [D-037](#d-037--execução-local-do-estoque-no-compose) | 2026-11-19 | Execução local do Estoque no Compose | aceita | — |
+| [D-038](#d-038--dependências-e-migrações-iniciais-do-faturamento) | 2026-11-19 | Dependências e migrações iniciais do Faturamento | aceita | — |
 
 ---
 
@@ -602,5 +603,19 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: o serviço pode ser consultado pelo host durante a demonstração local sem autenticação. O Compose permite selecionar os perfis por variável de ambiente. A verificação cobre os dois estados do filtro da API.
 - **Y-statement**: no contexto da demonstração em Docker, diante da necessidade de verificar o Estoque antes do Gateway, decidimos publicar o serviço em loopback e usar os perfis `docker,demo` por padrão para permitir que o avaliador consulte os dados de demonstração em uma subida local.
 - **Documentos afetados**: plano local de implementação (F1-13) · `docker-compose.yml` · `.env.example`.
+- **ADR**: —
+- **Substitui**: —
+
+### D-038 — Dependências e migrações iniciais do Faturamento
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-14 aplica ao Faturamento a estrutura entregue para o Estoque na F1-06. A D-025 autorizou as dependências do Estoque. O modelo de dados define o DDL inicial do Faturamento em §10.2 e nos apêndices A.2 e A.3.
+- **Opções consideradas**: 1) reutilizar as dependências da F1-06 com as versões gerenciadas pelo projeto e aplicar o DDL documentado. 2) definir um conjunto próprio de dependências para a inicialização do Faturamento, com configuração e verificação específicas.
+- **Decisão**: autorizar `common`, os starters Actuator, Security e Flyway, `flyway-database-postgresql` e o driver PostgreSQL. Para os testes, autorizar o starter de testes do Spring Boot, `spring-boot-testcontainers`, os módulos JUnit Jupiter, PostgreSQL e Kafka do Testcontainers e o ArchUnit. Usar as versões gerenciadas pelo POM pai. Criar as migrações iniciais V1–V6 conforme os apêndices A.2 e A.3.
+- **Consequências**: o Faturamento segue a base técnica da F1-06. O teste de subida usa PostgreSQL e Kafka reais em contêineres e valida os mapeamentos JPA compartilhados com o schema gerado pelo Flyway.
+- **Y-statement**: no contexto da inicialização do Faturamento, diante da necessidade de verificar a arquitetura e aplicar o schema inicial, decidimos reutilizar a base de dependências já validada e o DDL documentado para manter o build reproduzível e os dois serviços consistentes.
+- **Documentos afetados**: plano local de implementação (F1-14).
 - **ADR**: —
 - **Substitui**: —

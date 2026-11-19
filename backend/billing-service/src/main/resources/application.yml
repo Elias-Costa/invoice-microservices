@@ -1,0 +1,79 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: billing-service
+  datasource:
+    username: ${POSTGRES_BILLING_USER:billing_user}
+    password: ${POSTGRES_BILLING_PASSWORD:billing_pass}
+  flyway:
+    placeholders:
+      seed: 'false'
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  kafka:
+    consumer:
+      group-id: billing-service
+      auto-offset-reset: earliest
+  web:
+    locale: pt-BR
+    locale-resolver: fixed
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+invoice:
+  kafka:
+    topics:
+      - name: stock.debit-requested
+        partitions: 3
+      - name: stock.debit-confirmed
+        partitions: 3
+      - name: stock.debit-rejected
+        partitions: 3
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:postgresql://localhost:5434/billing_db
+  kafka:
+    bootstrap-servers: localhost:9092
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:postgresql://postgres-billing:5432/billing_db
+  kafka:
+    bootstrap-servers: kafka:9092
+
+---
+spring:
+  config:
+    activate:
+      on-profile: demo
+  flyway:
+    placeholders:
+      seed: 'true'
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  kafka:
+    admin:
+      fail-fast: true
