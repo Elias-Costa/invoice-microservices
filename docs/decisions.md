@@ -74,6 +74,8 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-036](#d-036--nova-tentativa-para-nota-com-baixa-confirmada) | 2026-11-19 | Nova tentativa para nota com baixa confirmada | aceita | — |
 | [D-037](#d-037--execução-local-do-estoque-no-compose) | 2026-11-19 | Execução local do Estoque no Compose | aceita | — |
 | [D-038](#d-038--dependências-e-migrações-iniciais-do-faturamento) | 2026-11-19 | Dependências e migrações iniciais do Faturamento | aceita | — |
+| [D-039](#d-039--histórico-e-dados-da-tentativa-de-impressão) | 2026-11-19 | Histórico e dados da tentativa de impressão | aceita | — |
+| [D-040](#d-040--limite-dos-totais-de-item-e-de-nota) | 2026-11-19 | Limite dos totais de item e de nota | aceita | — |
 
 ---
 
@@ -617,5 +619,33 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: o Faturamento segue a base técnica da F1-06. O teste de subida usa PostgreSQL e Kafka reais em contêineres e valida os mapeamentos JPA compartilhados com o schema gerado pelo Flyway.
 - **Y-statement**: no contexto da inicialização do Faturamento, diante da necessidade de verificar a arquitetura e aplicar o schema inicial, decidimos reutilizar a base de dependências já validada e o DDL documentado para manter o build reproduzível e os dois serviços consistentes.
 - **Documentos afetados**: plano local de implementação (F1-14).
+- **ADR**: —
+- **Substitui**: —
+
+### D-039 — Histórico e dados da tentativa de impressão
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a máquina de estados de `requisitos.md` §5 representa a edição como `OPEN → OPEN`. RF-INV-06 descreve o histórico de mudanças de status. O modelo §5.3 define o identificador da última tentativa de impressão e o instante em que o processamento começou.
+- **Opções consideradas**: registrar ou omitir a edição no histórico, incluir ou omitir `OPEN` em `allowedTransitions` e limpar ou manter `processingStartedAt` quando o processamento terminar.
+- **Decisão**: registrar a criação e as mudanças de status no histórico. Editar itens mantém `OPEN` e atualiza a auditoria da nota. `allowedTransitions` inclui `OPEN` como destino da edição. Ao confirmar ou rejeitar o fechamento, limpar `processingStartedAt` e manter o `printRequestId` da última tentativa.
+- **Consequências**: os consumidores da API veem a edição entre as opções de uma nota aberta. O histórico guarda a evolução do status. O instante de início acompanha o processamento em curso e o identificador da tentativa permanece disponível após o resultado.
+- **Y-statement**: no contexto da máquina de estados e da Saga, diante da edição em `OPEN` e do término do processamento, decidimos registrar mudanças de status, preservar as opções de edição e limpar o instante de início para refletir o estado atual da nota.
+- **Documentos afetados**: `requisitos.md` §3.5 e §5 · `modelo-de-dados.md` §5.3 e §5.5 (detalhamento registrado nesta decisão) · plano local de implementação (F1-15).
+- **ADR**: —
+- **Substitui**: —
+
+### D-040 — Limite dos totais de item e de nota
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RN-19 determina o cálculo do total de cada item e da nota. `modelo-de-dados.md` §5.3 e §5.4 definem `numeric(15,2)` para ambos. Valores individualmente válidos podem exceder o limite após multiplicação ou soma.
+- **Opções consideradas**: rejeitar no domínio com `validation-error` ou usar o mapeamento de falhas de integridade após a escrita no banco.
+- **Decisão**: rejeitar no domínio um valor acima do limite representável com `validation-error` (400). Indicar `lineTotal` para o total de um item e `total` para o da nota. Se a falha ocorrer na substituição de itens, preservar os itens, o total e a auditoria anteriores.
+- **Consequências**: a validação informa qual cálculo ultrapassou o limite antes de persistir alterações. O schema e a regra de arredondamento permanecem aplicáveis.
+- **Y-statement**: no contexto do cálculo de totais, diante da possibilidade de exceder a capacidade de `numeric(15,2)`, decidimos validar cada resultado no domínio para informar o campo afetado ao usuário e preservar a nota.
+- **Documentos afetados**: `requisitos.md` RN-19 e §8.8 · `modelo-de-dados.md` §5.3 e §5.4 (detalhamento registrado nesta decisão) · plano local de implementação (F1-15).
 - **ADR**: —
 - **Substitui**: —
