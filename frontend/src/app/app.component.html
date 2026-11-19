@@ -1,0 +1,54 @@
+<mat-toolbar class="topbar">
+  @if (compact()) {
+    <button
+      mat-icon-button
+      type="button"
+      class="menu-toggle"
+      aria-label="Menu principal"
+      aria-controls="navigation-drawer"
+      [attr.aria-expanded]="drawer.opened"
+      (click)="drawer.toggle()"
+    >
+      <span class="toggle-icon" aria-hidden="true"></span>
+    </button>
+  }
+  <span class="brand-mark" aria-hidden="true"></span>
+  <span class="brand-name">Notas Fiscais</span>
+</mat-toolbar>
+
+<mat-sidenav-container class="workspace">
+  <mat-sidenav
+    #drawer
+    id="navigation-drawer"
+    class="sidenav"
+    [mode]="compact() ? 'over' : 'side'"
+    [opened]="!compact()"
+  >
+    <mat-nav-list class="navigation" aria-label="Navegação principal">
+      <a
+        mat-list-item
+        routerLink="/"
+        routerLinkActive="active-link"
+        [routerLinkActiveOptions]="{ exact: true }"
+        ariaCurrentWhenActive="page"
+        (click)="compact() && drawer.close()"
+      >
+        <span matListItemIcon class="nav-icon overview" aria-hidden="true"></span>
+        <span matListItemTitle>Visão geral</span>
+      </a>
+
+      @for (section of upcomingSections; track section.label) {
+        <a mat-list-item disabled role="link">
+          <span matListItemIcon [class]="'nav-icon ' + section.icon" aria-hidden="true"></span>
+          <span matListItemTitle>{{ section.label }}</span>
+        </a>
+      }
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content id="workspace-content" role="main" class="content">
+    <div class="content-inner">
+      <router-outlet />
+    </div>
+  </mat-sidenav-content>
+</mat-sidenav-container>

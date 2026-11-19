@@ -59,6 +59,7 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-021](#d-021--role-de-aplicação-não-superusuário-por-banco-criada-por-script-de-init-variáveis-postgres_) | 2026-09-13 | Role de aplicação não-superusuário por banco, criada por script de init; variáveis `POSTGRES_*` | aceita | ADR-004 |
 | [D-022](#d-022--integração-local-do-codex-ao-fluxo-de-trabalho) | 2026-11-19 | Integração local do Codex ao fluxo de trabalho | aceita | — |
 | [D-023](#d-023--uso-alternado-de-claude-code-e-codex) | 2026-11-19 | Uso alternado de Claude Code e Codex | aceita | — |
+| [D-024](#d-024--shell-angular-antes-da-integração-com-o-gateway) | 2026-11-19 | Shell Angular antes da integração com o Gateway | aceita | ADR-001 |
 
 ---
 
@@ -393,4 +394,18 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Y-statement**: No contexto de um checkout compartilhado, diante da necessidade de trocar de agente entre sessões, decidimos usar Claude Code e Codex em sequência para preservar a continuidade da tarefa, aceitando concluir a sessão atual antes de iniciar a próxima.
 - **Documentos afetados**: `AGENTS.md` · `guia-trabalho-com-agente.md` · plano local · skill local `$tarefa`
 - **ADR**: —
+- **Substitui**: —
+
+### D-024 — Shell Angular antes da integração com o Gateway
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-24 agrupava o shell Angular e a integração com o Gateway. O humano quer visualizar a interface mais cedo e aprovou antecipar o shell, com nome e tema definidos.
+- **Opções consideradas**: 1) antecipar o shell e manter a integração na posição original do roteiro; 2) entregar toda a F1-24 após o Gateway.
+- **Decisão**: (1). Executar F1-24A antes de F1-06 com o workspace e o shell estático da F1-24. Usar “Notas Fiscais” na barra superior, tema claro em azul-petróleo e cinzas neutros, Angular, CLI, Material e CDK em 22.3.0 com Vitest, ESLint e Prettier. A F1-24 passa a depender também da F1-24A e entrega a integração com o Gateway e os componentes compartilhados de API.
+- **Consequências**: + o shell pode ser executado e revisado antes dos microsserviços; − os dados e fluxos de negócio chegam nas tarefas de integração e de cada tela.
+- **Y-statement**: No contexto do MVP, diante da necessidade de visualizar a interface mais cedo, decidimos antecipar o shell Angular para permitir revisão visual antes do Gateway, aceitando entregar as conexões com a API em etapas posteriores.
+- **Documentos afetados**: plano local de implementação (reordenado). `requisitos.md` §9, §11 e `modelo-de-dados.md` permanecem aplicáveis.
+- **ADR**: ADR-001 (versão exata registrada aqui, conforme D-008)
 - **Substitui**: —

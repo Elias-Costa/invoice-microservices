@@ -1,0 +1,55 @@
+@use '@angular/material' as mat;
+
+html {
+  color-scheme: light;
+  @include mat.theme(
+    (
+      color: mat.$cyan-palette,
+      typography: (
+        plain-family: (
+          'Segoe UI',
+          system-ui,
+          sans-serif,
+        ),
+        brand-family: (
+          'Segoe UI',
+          system-ui,
+          sans-serif,
+        ),
+      ),
+      density: 0,
+    )
+  );
+  --invoice-brand: #123c3f;
+  --invoice-canvas: #f4f7f7;
+  --invoice-border: #dbe5e5;
+  --invoice-ink: #193134;
+  --invoice-muted: #506466;
+}
+
+body {
+  margin: 0;
+  background: var(--invoice-canvas);
+  color: var(--invoice-ink);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.page-heading {
+  margin: 0 0 1.5rem;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+.workspace-card {
+  --mat-card-outlined-container-color: #fff;
+  --mat-card-outlined-outline-color: var(--invoice-border);
+  --mat-card-outlined-container-shape: 1rem;
+}
+
+.page-description {
+  margin: 0;
+  color: var(--invoice-muted);
+  line-height: 1.6;
+}
