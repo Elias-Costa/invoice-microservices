@@ -1,11 +1,13 @@
 package dev.eliascosta.invoice.stock.application.service;
 
 import dev.eliascosta.invoice.common.error.ConflictException;
+import dev.eliascosta.invoice.common.error.InvalidRequestException;
 import dev.eliascosta.invoice.common.error.ProblemTypes;
 import dev.eliascosta.invoice.stock.domain.exception.ImmutableProductFieldException;
 import dev.eliascosta.invoice.stock.domain.exception.ProductCodeAlreadyExistsException;
 import dev.eliascosta.invoice.stock.domain.exception.ProductNotFoundException;
 import dev.eliascosta.invoice.stock.domain.model.Product;
+import dev.eliascosta.invoice.stock.domain.model.StockMovement;
 import dev.eliascosta.invoice.stock.domain.port.PageResult;
 import dev.eliascosta.invoice.stock.domain.port.ProductSearch;
 import dev.eliascosta.invoice.stock.domain.port.in.CreateProductUseCase;
@@ -13,14 +15,18 @@ import dev.eliascosta.invoice.stock.domain.port.in.DeactivateProductUseCase;
 import dev.eliascosta.invoice.stock.domain.port.in.GetProductUseCase;
 import dev.eliascosta.invoice.stock.domain.port.in.GetProductsByIdsUseCase;
 import dev.eliascosta.invoice.stock.domain.port.in.ListProductsUseCase;
+import dev.eliascosta.invoice.stock.domain.port.in.ListStockMovementsUseCase;
 import dev.eliascosta.invoice.stock.domain.port.in.ReactivateProductUseCase;
+import dev.eliascosta.invoice.stock.domain.port.in.RegisterStockMovementUseCase;
 import dev.eliascosta.invoice.stock.domain.port.in.UpdateProductUseCase;
 import dev.eliascosta.invoice.stock.domain.port.out.ProductRepository;
 import dev.eliascosta.invoice.stock.domain.port.out.StockMovementRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -36,7 +42,9 @@ class ProductService
         GetProductUseCase,
         GetProductsByIdsUseCase,
         DeactivateProductUseCase,
-        ReactivateProductUseCase {
+        ReactivateProductUseCase,
+        RegisterStockMovementUseCase,
+        ListStockMovementsUseCase {
 
   private final ProductRepository products;
   private final StockMovementRepository movements;
@@ -131,6 +139,37 @@ class ProductService
     }
     product.reactivate(updatedBy, clock.instant());
     return products.save(product);
+  }
+
+  @Override
+  @Transactional
+  public StockMovement register(RegisterStockMovementUseCase.Command command) {
+    Product product = get(command.productId());
+    Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
+    StockMovement movement =
+        switch (command.type()) {
+          case INBOUND ->
+              product.credit(command.quantity(), command.reason(), command.createdBy(), now);
+          case OUTBOUND ->
+              product.debitManual(command.quantity(), command.reason(), command.createdBy(), now);
+          case null, default ->
+              throw new InvalidRequestException(
+                  ProblemTypes.VALIDATION_ERROR,
+                  "Dados inválidos",
+                  "Uma movimentação manual deve ser INBOUND ou OUTBOUND.",
+                  Map.of(
+                      "errors",
+                      List.of(Map.of("field", "type", "message", "Use INBOUND ou OUTBOUND."))));
+        };
+    products.save(product);
+    movements.append(movement);
+    return movement;
+  }
+
+  @Override
+  public PageResult<StockMovement> list(UUID productId, int page, int size) {
+    get(productId);
+    return movements.findByProductId(productId, page, size);
   }
 
   private static boolean isProductCodeConflict(DataIntegrityViolationException failure) {

@@ -69,6 +69,7 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-031](#d-031--contrato-rest-de-produtos-na-f1-09) | 2026-11-19 | Contrato REST de produtos na F1-09 | aceita | — |
 | [D-032](#d-032--auditoria-e-idempotência-http-de-produtos-na-f1) | 2026-11-19 | Auditoria e idempotência HTTP de produtos na F1 | aceita | — |
 | [D-033](#d-033--alinhamento-dos-documentos-ao-contrato-de-produtos) | 2026-11-19 | Alinhamento dos documentos ao contrato de produtos | aceita | — |
+| [D-034](#d-034--respostas-rest-de-movimentações-de-estoque) | 2026-11-19 | Respostas REST de movimentações de estoque | aceita | — |
 
 ---
 
@@ -542,5 +543,19 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: os documentos passam a descrever a rota de histórico, os campos e a ordenação, os `POST` que exigem chave, o formato UUID e a autoria `anonymous` no Estoque da F1.
 - **Y-statement**: No contexto da entrega da API de produtos, diante da diferença entre a especificação anterior e o contrato aprovado, decidimos alinhar os documentos de referência para que os consumidores tenham a mesma descrição aplicada pelo serviço.
 - **Documentos afetados**: `requisitos.md` §3.2, RN-16, §8.6, §8.8 e §8.9 · `modelo-de-dados.md` §2.5 (atualizados em 2026-11-19).
+- **ADR**: —
+- **Substitui**: —
+
+### D-034 — Respostas REST de movimentações de estoque
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-STK-01 e RF-STK-02 definem as rotas, os status e os dados do histórico. A F1-10 precisava definir os campos JSON de cada item, o corpo do cadastro e a aplicação da autoria da F1 às movimentações manuais.
+- **Opções consideradas**: 1) usar a mesma representação no cadastro e no histórico. 2) definir respostas diferentes para as duas operações.
+- **Decisão**: o `POST` retorna `201` com o mesmo objeto usado em cada item do `GET` paginado. Os campos são `id`, `productId`, `type`, `quantity`, `balanceAfter`, `reason`, `referenceId`, `referenceNumber`, `createdBy` e `createdAt`. O `POST` omite o header `Location`. Na F1, as movimentações manuais registram `anonymous`.
+- **Consequências**: a resposta da gravação fornece o saldo resultante e pode ser exibida junto com os itens do histórico. A referência de nota usa campos nulos nas movimentações manuais.
+- **Y-statement**: No contexto das movimentações manuais e do histórico, diante da necessidade de exibir o saldo após cada operação, decidimos compartilhar a representação REST para devolver os mesmos dados nas duas rotas, aceitando omitir o `Location` enquanto a consulta estiver disponível pela coleção.
+- **Documentos afetados**: `requisitos.md` §3.3 e §8.6 · `modelo-de-dados.md` §2.5 e §4.3 (detalhamento registrado nesta decisão) · plano local de implementação (F1-10).
 - **ADR**: —
 - **Substitui**: —

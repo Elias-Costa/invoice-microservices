@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import dev.eliascosta.invoice.common.error.ConflictException;
+import dev.eliascosta.invoice.common.error.InvalidRequestException;
 import dev.eliascosta.invoice.stock.domain.exception.ImmutableProductFieldException;
 import dev.eliascosta.invoice.stock.domain.exception.ProductCodeAlreadyExistsException;
 import dev.eliascosta.invoice.stock.domain.exception.ProductNotFoundException;
@@ -22,6 +23,7 @@ import dev.eliascosta.invoice.stock.domain.model.StockMovement;
 import dev.eliascosta.invoice.stock.domain.port.PageResult;
 import dev.eliascosta.invoice.stock.domain.port.ProductSearch;
 import dev.eliascosta.invoice.stock.domain.port.in.CreateProductUseCase;
+import dev.eliascosta.invoice.stock.domain.port.in.RegisterStockMovementUseCase;
 import dev.eliascosta.invoice.stock.domain.port.in.UpdateProductUseCase;
 import dev.eliascosta.invoice.stock.domain.port.out.ProductRepository;
 import dev.eliascosta.invoice.stock.domain.port.out.StockMovementRepository;
@@ -40,6 +42,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
@@ -190,6 +193,35 @@ class ProductServiceTest {
     assertThat(service.reactivate(ID, USER).isActive()).isTrue();
     assertThat(service.reactivate(ID, USER).isActive()).isTrue();
     verify(products, times(2)).save(product);
+    verifyNoInteractions(movements);
+  }
+
+  @Test
+  void rejectsAnInvoiceDebitThroughTheManualMovementPort() {
+    when(products.findById(ID)).thenReturn(Optional.of(restoredProduct(true)));
+    var command =
+        new RegisterStockMovementUseCase.Command(
+            ID, MovementType.INVOICE_DEBIT, new Quantity(1), "Venda", USER);
+
+    assertThatThrownBy(() -> service.register(command))
+        .isInstanceOfSatisfying(
+            InvalidRequestException.class,
+            failure -> assertThat(failure.getType()).isEqualTo("validation-error"));
+    verify(products, never()).save(any());
+    verifyNoInteractions(movements);
+  }
+
+  @Test
+  void doesNotAppendTheMovementWhenTheProductSaveHasAnOptimisticConflict() {
+    Product product = restoredProduct(true);
+    when(products.findById(ID)).thenReturn(Optional.of(product));
+    var conflict = new ObjectOptimisticLockingFailureException(Product.class, ID);
+    when(products.save(product)).thenThrow(conflict);
+    var command =
+        new RegisterStockMovementUseCase.Command(
+            ID, MovementType.OUTBOUND, new Quantity(1), "Ajuste", USER);
+
+    assertThatThrownBy(() -> service.register(command)).isSameAs(conflict);
     verifyNoInteractions(movements);
   }
 
