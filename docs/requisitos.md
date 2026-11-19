@@ -317,24 +317,24 @@ Cada requisito traz prioridade (MoSCoW), fase de entrega e critérios de aceite 
 
 **RF-INV-01 — Criar nota fiscal.** Entrada: `customerId` e lista de itens `{productId, quantity}` (≥ 1 item, `quantity ≥ 1`). O serviço valida o cliente localmente e os produtos via `stock-service` (RF-PRD-06), grava snapshot de código, descrição e preço unitário em cada item, calcula totais e atribui número sequencial. Status inicial `OPEN`.
 - CA1: `POST /api/billing/invoices` válido → `201` com `number`, `status = OPEN`, itens com `productCode`, `productDescription`, `unitPrice`, `lineTotal` e `total` da nota.
-- CA2: Produto inexistente ou inativo → `422` (`product-not-found` / `product-inactive`) indicando qual item.
-- CA3: Cliente inexistente/inativo → `422`.
+- CA2: Produto inexistente ou inativo → `422` (`product-not-found` / `product-inactive`) com o `productId` do item.
+- CA3: Cliente inexistente ou inativo → `422` (`customer-not-found` / `customer-inactive`) com o `customerId`.
 - CA4: Produto repetido na lista → `400` (`duplicate-invoice-item`).
 - CA5: `stock-service` indisponível → `503` (`stock-service-unavailable`) com mensagem orientando nova tentativa; nada é persistido.
 - CA6: Exige `Idempotency-Key`; reenvio idêntico retorna a mesma nota (mesmo `number`), sem criar duplicata.
 - CA7: Saldo **não** é verificado nem reservado na criação (RN-09); a UI apenas exibe alerta informativo quando `quantity > balance` atual.
 - CA8: Na UI: seleção de cliente por autocomplete; itens adicionados por autocomplete de produto (busca no Estoque com debounce) com exibição de saldo e preço atuais; `FormArray` tipado; totais recalculados via `computed()`.
 
-**RF-INV-02 — Listar notas.** Paginação, ordenação (padrão: `number desc`), filtro por `status`, por cliente e por intervalo de datas.
+**RF-INV-02 — Listar notas.** Paginação, ordenação (padrão `number,desc`), filtro por `status`, por cliente e por data de criação. Os limites `from` (inclusivo) e `to` (exclusivo) são independentes. Quando `from >= to`, a página é vazia.
 - CA1: `GET /api/billing/invoices?status=OPEN&page=0&size=20` → `200`.
 - CA2: Na UI, chips de status coloridos (`OPEN` azul, `PROCESSING` âmbar com spinner, `CLOSED` verde, `CANCELED` cinza).
 
-**RF-INV-03 — Consultar nota.** Detalhe completo: número, status, cliente (snapshot), itens, totais, datas (`createdAt`, `closedAt`, `canceledAt`), `lastFailureReason` (quando houver) e ações disponíveis conforme status e perfil.
+**RF-INV-03 — Consultar nota.** O detalhe reúne número, status, snapshot do cliente, itens, total, datas (`createdAt`, `closedAt`, `canceledAt`), `lastFailureReason`, `cancelReason`, versão e ações disponíveis conforme status, operações implementadas e perfil. Uma nota inexistente retorna `404 invoice-not-found`.
 
-**RF-INV-04 — Editar itens de nota aberta.** Substitui a lista completa de itens (`PUT /api/billing/invoices/{id}/items`). Revalida produtos no Estoque e atualiza snapshots/totais.
+**RF-INV-04 — Editar itens de nota aberta.** Substitui a lista completa de itens (`PUT /api/billing/invoices/{id}/items`). Recebe `{items, version}`, revalida produtos no Estoque e atualiza snapshots e totais. Uma versão desatualizada retorna `409 optimistic-lock-conflict`.
 - CA1: Nota `OPEN` → `200` com itens atualizados.
 - CA2: Nota em qualquer outro status → `409` (`invalid-invoice-status`).
-- CA3: Cliente **não** é editável após criação (Could: permitir troca enquanto `OPEN` — F3).
+- CA3: O cliente é imutável após a criação. Enviar `customerId` na edição retorna `400 field-immutable` (Could: permitir troca enquanto `OPEN` — F3).
 
 **RF-INV-05 — Cancelar nota aberta.** `ADMIN` cancela nota `OPEN` informando motivo. Sem efeito no estoque (RN-12).
 - CA1: `POST /api/billing/invoices/{id}/cancel` `{reason}` → `200`, `status = CANCELED`, `canceledAt` preenchido.
@@ -938,16 +938,20 @@ A listagem usa `active=true` por padrão e aceita ordenar por `code`, `descripti
 | GET | `/invoices` | OPERATOR, ADMIN | | 200 | Lista paginada (`status`, `customerId`, `from`, `to`) |
 | GET | `/invoices/{id}` | OPERATOR, ADMIN | | 200 | Detalhe |
 | POST | `/invoices` | OPERATOR, ADMIN | ✔ | 201 | Cria (`OPEN`) |
-| PUT | `/invoices/{id}/items` | OPERATOR, ADMIN | | 200 | Substitui itens (só `OPEN`) |
+| PUT | `/invoices/{id}/items` | OPERATOR, ADMIN | | 200 | Substitui itens (só `OPEN`, envia `version`) |
 | POST | `/invoices/{id}/print` | OPERATOR, ADMIN | ✔ | 202 | Inicia fechamento |
 | POST | `/invoices/{id}/cancel` | ADMIN | | 200 | Cancela (só `OPEN`) |
 | GET | `/invoices/{id}/pdf` | OPERATOR, ADMIN | | 200 | PDF (só `CLOSED`) |
 | GET | `/invoices/{id}/history` | OPERATOR, ADMIN | | 200 | Transições de status |
 | GET | `/actuator/health` | público | | 200 | Saúde |
 
-O `billing-service` expõe as rotas de clientes com o prefixo `/api/billing`, preservado pelo gateway. As respostas de cliente incluem `id`, `name`, `document`, `documentType`, `email`, `phone`, `active` e `version`. O detalhe inclui `recentInvoices` com `id`, `number`, `status`, `total` e `createdAt` por nota.
+O `billing-service` expõe as rotas de clientes e notas com o prefixo `/api/billing`, preservado pelo gateway. As respostas de cliente incluem `id`, `name`, `document`, `documentType`, `email`, `phone`, `active` e `version`. O detalhe inclui `recentInvoices` com `id`, `number`, `status`, `total` e `createdAt` por nota.
 
 A listagem de clientes usa `active=true` e `sort=name,asc` por padrão. Aceita ordenar por `name`, `document` ou `active`. Campo ou direção inválidos retornam `400 validation-error`.
+
+A listagem de notas inclui `id`, `number`, `status`, `customerId`, `customerName`, `total` e `createdAt`. Aceita ordenar por `number`, `status`, `customerName`, `total` ou `createdAt`, com padrão `number,desc`. Campo ou direção inválidos retornam `400 validation-error`.
+
+A consulta individual, a criação, a edição e o cancelamento de nota retornam `id`, `number`, `status`, `customer {id, name, document}`, `items [{id, productId, productCode, productDescription, unitPrice, quantity, lineTotal, lineOrder}]`, `total`, `createdAt`, `closedAt`, `canceledAt`, `lastFailureReason`, `cancelReason`, `version` e `allowedActions`. Em `OPEN`, a F1-19 disponibiliza `EDIT_ITEMS` e `CANCEL`. A F1-20 acrescenta `PRINT` em `OPEN` com a rota de impressão. Nos demais status, a lista de ações da F1 é vazia.
 
 Convenções: paginação `page` (0-based), `size` (padrão 20, máx. 100), `sort=campo,asc|desc`; resposta `{content, page: {number, size, totalElements, totalPages}}`; ids UUID; datas ISO-8601 UTC; moeda como número decimal (string JSON não é usada).
 
@@ -998,16 +1002,17 @@ Todo erro retorna `application/problem+json`:
 | `type` (slug) | Status | Origem |
 |---|---|---|
 | `validation-error` | 400 | Bean Validation / formato |
-| `field-immutable` | 400 | Tentativa de alterar `code` ou `document`, ou de enviar `balance` na edição de produto |
+| `field-immutable` | 400 | Tentativa de alterar `code` ou `document`, ou de enviar `balance` na edição de produto ou `customerId` na edição de itens da nota |
 | `duplicate-invoice-item` | 400 | RN-08 |
 | `unauthorized` | 401 | Token ausente/inválido |
 | `forbidden` | 403 | Role insuficiente |
-| `product-not-found`, `customer-not-found`, `invoice-not-found` | 404 | Id inexistente |
+| `product-not-found`, `customer-not-found`, `invoice-not-found` | 404 | Recurso solicitado por ID inexistente |
 | `product-code-already-exists`, `customer-document-already-exists` | 409 | Unicidade |
 | `invalid-invoice-status` | 409 | Transição inválida (inclui `currentStatus`, `allowedTransitions`) |
 | `optimistic-lock-conflict` | 409 | Edição concorrente |
 | `unique-constraint-violation` | 409 | Violação de unicidade no banco não tratada pela aplicação (SQLState `23505`) — rede de segurança; a aplicação deve detectar antes e usar o `type` específico (D-011) |
 | `idempotency-key-in-flight` | 409 | Chave em processamento |
+| `product-not-found`, `customer-not-found` | 422 | Referência inexistente ao validar uma nota (D-051) |
 | `product-inactive`, `customer-inactive` | 422 | RN-03, RN-20 |
 | `insufficient-stock` | 422 | RN-02 |
 | `idempotency-key-payload-mismatch` | 422 | RN-16 |

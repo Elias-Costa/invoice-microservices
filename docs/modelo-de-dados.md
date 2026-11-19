@@ -107,7 +107,7 @@ Todas as tabelas de agregados possuem:
 
 Tabelas append-only (`stock_movements`, `invoice_status_history`, `processed_events`) têm apenas `created_*`/`*_at`.
 
-Na F1, as operações HTTP de produtos do Estoque e de clientes do Faturamento registram `anonymous` na auditoria. No cadastro de produto, o produto e a movimentação `INITIAL` recebem o mesmo autor.
+Na F1, as operações HTTP de produtos, clientes e notas registram `anonymous` na auditoria. No cadastro de produto, o produto e a movimentação `INITIAL` recebem o mesmo autor.
 
 ### 2.6 Exclusão lógica
 
@@ -116,6 +116,8 @@ Na F1, as operações HTTP de produtos do Estoque e de clientes do Faturamento r
 ### 2.7 Controle de concorrência
 
 Agregados mutáveis (`products`, `customers`, `invoices`) têm coluna `version bigint` gerenciada por JPA `@Version` (locking otimista, ADR-008). Clientes REST enviam `version` em `PUT`; divergência → `409 optimistic-lock-conflict`. Consumidores Kafka fazem retry local em `OptimisticLockException`.
+
+A substituição de itens da nota usa a `version` retornada no detalhe. A requisição de edição aceita os itens e a versão. O envio de `customerId` retorna `400 field-immutable` (D-053).
 
 ### 2.8 Snapshots (desnormalização intencional)
 
@@ -494,6 +496,8 @@ Agregado raiz **Invoice**.
 | `ix_invoices_customer_created` | `(customer_id, created_at DESC)` | Notas de um cliente (RF-CUS-03) |
 | `ix_invoices_created` | `(created_at DESC)` | Filtro por período |
 | `ix_invoices_processing` | `(processing_started_at) WHERE status = 'PROCESSING'` | Job de reconciliação; parcial, quase sempre vazio |
+
+A listagem filtra `created_at` com `from` inclusivo e `to` exclusivo. Cada limite pode ser usado de forma independente. Com os dois limites e `from >= to`, a página é vazia (D-042, D-053).
 
 **Sequence**
 

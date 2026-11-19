@@ -86,6 +86,9 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-048](#d-048--janela-do-circuito-do-estoque) | 2026-11-19 | Janela do circuito do Estoque | aceita | — |
 | [D-049](#d-049--lotes-e-falhas-http-na-consulta-ao-estoque) | 2026-11-19 | Lotes e falhas HTTP na consulta ao Estoque | aceita | — |
 | [D-050](#d-050--alinhamento-do-exemplo-de-resiliência-do-estoque) | 2026-11-19 | Alinhamento do exemplo de resiliência do Estoque | aceita | — |
+| [D-051](#d-051--referências-inexistentes-na-api-de-notas) | 2026-11-19 | Referências inexistentes na API de notas | aceita | — |
+| [D-052](#d-052--respostas-e-ordenação-da-api-de-notas) | 2026-11-19 | Respostas e ordenação da API de notas | aceita | — |
+| [D-053](#d-053--edição-período-e-auditoria-da-api-de-notas) | 2026-11-19 | Edição, período e auditoria da API de notas | aceita | — |
 
 ---
 
@@ -797,5 +800,47 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: o exemplo documenta os valores do `billing-service` e permite conferir a política aplicada na F1-18.
 - **Y-statement**: no contexto da consulta síncrona ao Estoque, diante da diferença entre o exemplo e a configuração em uso, decidimos alinhar o bloco YAML para que a especificação reflita a política aprovada.
 - **Documentos afetados**: `requisitos.md` §8.11 · plano local de implementação (F1-18).
+- **ADR**: —
+- **Substitui**: —
+
+### D-051 — Referências inexistentes na API de notas
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-INV-01 CA2–CA3 pede 422 ao validar um cliente ou produto inexistente. O catálogo de erros do §8.8 atribui 404 aos mesmos tipos em consultas por ID.
+- **Opções consideradas**: manter 422 para referências da nota ou aplicar 404 também à validação dessas referências.
+- **Decisão**: retornar 422 `customer-not-found` ou `product-not-found` na validação da nota, com `customerId` ou `productId` no `ProblemDetail`. A nota solicitada por ID, quando inexistente, retorna 404 `invoice-not-found`.
+- **Consequências**: a API identifica o campo de referência que deve ser corrigido e permite distinguir a falha no formulário de uma nota ausente.
+- **Y-statement**: no contexto da validação de uma nota, diante da diferença entre os critérios de aceite e o catálogo, decidimos aplicar 422 às referências inválidas para identificar os dados que o usuário deve corrigir.
+- **Documentos afetados**: `requisitos.md` RF-INV-01 e §8.8 · plano local de implementação (F1-19).
+- **ADR**: —
+- **Substitui**: —
+
+### D-052 — Respostas e ordenação da API de notas
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-INV-01 a RF-INV-05 e `requisitos.md` §8.6 descrevem as operações, com lacunas nos campos das respostas, nas ações disponíveis e nos campos de ordenação da listagem.
+- **Opções consideradas**: usar um resumo paginado e compartilhar o formato de detalhe entre a consulta e as escritas ou definir uma resposta específica para cada operação.
+- **Decisão**: listar `id`, `number`, `status`, `customerId`, `customerName`, `total` e `createdAt`. Permitir ordenar por `number`, `status`, `customerName`, `total` e `createdAt`, com padrão `number,desc`. A consulta individual, a criação, a edição e o cancelamento retornam `id`, `number`, `status`, `customer {id, name, document}`, `items [{id, productId, productCode, productDescription, unitPrice, quantity, lineTotal, lineOrder}]`, `total`, `createdAt`, `closedAt`, `canceledAt`, `lastFailureReason`, `cancelReason`, `version` e `allowedActions`. Na F1-19, `allowedActions` contém `EDIT_ITEMS` e `CANCEL` para `OPEN` e fica vazio nos demais status. A F1-20 acrescenta `PRINT` quando a rota de impressão estiver disponível.
+- **Consequências**: listagem e detalhe usam os snapshots gravados na nota. Os consumidores podem reaproveitar a versão recebida após uma edição e habilitar as ações que a API oferece.
+- **Y-statement**: no contexto da API de notas, diante da necessidade de integrar a listagem e o detalhe ao frontend, decidimos compartilhar a resposta de detalhe nas operações individuais e limitar a listagem a um resumo paginado.
+- **Documentos afetados**: `requisitos.md` RF-INV-02, RF-INV-03 e §8.6 · plano local de implementação (F1-19 e F1-20).
+- **ADR**: —
+- **Substitui**: —
+
+### D-053 — Edição, período e auditoria da API de notas
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-INV-04 protege o cliente da nota. O modelo §2.7 exige versão nos `PUT`, D-042 define os limites do período e D-044 registra a convenção de autoria HTTP usada em clientes na F1.
+- **Opções consideradas**: rejeitar ou ignorar `customerId` na edição, retornar lista vazia ou erro para intervalo vazio e aplicar às notas a mesma autoria usada para clientes.
+- **Decisão**: usar `anonymous` na auditoria HTTP das notas da F1. Aceitar `{items, version}` em `PUT /invoices/{id}/items` e rejeitar o envio de `customerId` com 400 `field-immutable`. Quando `from >= to`, devolver uma página vazia conforme os limites de D-042. Alinhar `requisitos.md` e `modelo-de-dados.md` às decisões D-051 a D-053.
+- **Consequências**: a edição exige a versão lida pelo consumidor e informa explicitamente a tentativa de alterar o cliente. Um intervalo vazio usa o formato normal de paginação.
+- **Y-statement**: no contexto da edição e da listagem de notas na F1, diante das lacunas na autoria e nos parâmetros, decidimos explicitar a imutabilidade do cliente, o controle de versão e a resposta de um período vazio para que o consumidor possa tratar esses casos.
+- **Documentos afetados**: `requisitos.md` RF-INV-02, RF-INV-04 e §8.6–8.8 · `modelo-de-dados.md` §2.5, §2.7 e §5.3 · plano local de implementação (F1-19).
 - **ADR**: —
 - **Substitui**: —

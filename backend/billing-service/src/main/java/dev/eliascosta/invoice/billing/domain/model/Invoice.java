@@ -124,7 +124,7 @@ public final class Invoice {
   }
 
   public void replaceItems(List<InvoiceItem.Input> items, String changedBy, Instant changedAt) {
-    requireStatus(InvoiceStatus.OPEN);
+    ensureOpen();
     List<InvoiceItem> replacement = createItems(items);
     Money replacementTotal = totalOf(replacement);
     Objects.requireNonNull(changedAt, "changedAt");
@@ -135,7 +135,7 @@ public final class Invoice {
   }
 
   public UUID requestPrint(String changedBy, Instant changedAt) {
-    requireStatus(InvoiceStatus.OPEN);
+    ensureOpen();
     UUID requestId = UUID.randomUUID();
     transitionTo(InvoiceStatus.PROCESSING, null, changedBy, changedAt);
     printRequestId = requestId;
@@ -160,11 +160,15 @@ public final class Invoice {
   }
 
   public void cancel(String reason, String changedBy, Instant changedAt) {
-    requireStatus(InvoiceStatus.OPEN);
+    ensureOpen();
     String validatedReason = requiredText(reason, "reason", 500);
     transitionTo(InvoiceStatus.CANCELED, validatedReason, changedBy, changedAt);
     canceledAt = changedAt;
     cancelReason = validatedReason;
+  }
+
+  public void ensureOpen() {
+    requireStatus(InvoiceStatus.OPEN);
   }
 
   private void transitionTo(InvoiceStatus target, String reason, String actor, Instant at) {
