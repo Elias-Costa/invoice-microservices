@@ -60,6 +60,7 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-022](#d-022--integração-local-do-codex-ao-fluxo-de-trabalho) | 2026-11-19 | Integração local do Codex ao fluxo de trabalho | aceita | — |
 | [D-023](#d-023--uso-alternado-de-claude-code-e-codex) | 2026-11-19 | Uso alternado de Claude Code e Codex | aceita | — |
 | [D-024](#d-024--shell-angular-antes-da-integração-com-o-gateway) | 2026-11-19 | Shell Angular antes da integração com o Gateway | aceita | ADR-001 |
+| [D-025](#d-025--dependências-maven-do-stock-service-na-f1-06) | 2026-11-19 | Dependências Maven do `stock-service` na F1-06 | aceita | — |
 
 ---
 
@@ -408,4 +409,18 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Y-statement**: No contexto do MVP, diante da necessidade de visualizar a interface mais cedo, decidimos antecipar o shell Angular para permitir revisão visual antes do Gateway, aceitando entregar as conexões com a API em etapas posteriores.
 - **Documentos afetados**: plano local de implementação (reordenado). `requisitos.md` §9, §11 e `modelo-de-dados.md` permanecem aplicáveis.
 - **ADR**: ADR-001 (versão exata registrada aqui, conforme D-008)
+- **Substitui**: —
+
+### D-025 — Dependências Maven do `stock-service` na F1-06
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-06 introduz as dependências do serviço para integrar `common`, expor Actuator, configurar `permitAll`, aplicar migrações PostgreSQL e verificar a arquitetura e a subida com o Maven Wrapper.
+- **Opções consideradas**: 1) reutilizar o BOM do Spring Boot e centralizar a versão do ArchUnit no POM pai; 2) fixar as versões das dependências diretamente no POM do serviço.
+- **Decisão**: usar `common`, `spring-boot-starter-actuator`, `spring-boot-starter-security`, `spring-boot-starter-flyway`, `org.flywaydb:flyway-database-postgresql` e `org.postgresql:postgresql` com escopo `runtime` para o driver. Usar as versões do BOM para as dependências externas gerenciadas. Nos testes, usar `spring-boot-starter-test`, `spring-boot-testcontainers` com `@ServiceConnection`, os módulos JUnit, PostgreSQL e Kafka do Testcontainers, e `com.tngtech.archunit:archunit` com escopo `test`. Gerenciar o ArchUnit em `dependencyManagement` do POM pai com `archunit.version=1.5.1`. Confirmar no relatório do Surefire que `StockArchitectureTest` foi executado. Na F2, trocar `spring-boot-starter-security` por `spring-boot-starter-oauth2-resource-server` para implementar RNF-SEC-02.
+- **Consequências**: as versões do serviço seguem o BOM, os testes de arquitetura compartilham uma versão explícita do ArchUnit e o IT de subida usa as conexões fornecidas pelos containers. A F2 requer atualizar o POM e a configuração isolada de segurança.
+- **Y-statement**: No contexto do bootstrap do Estoque, diante da necessidade de validar a arquitetura e a aplicação das migrações, decidimos reutilizar as dependências gerenciadas e centralizar a versão do ArchUnit para manter o build reproduzível, aceitando atualizar a dependência de segurança na F2.
+- **Documentos afetados**: plano local de implementação (F1-06). `requisitos.md` §7.4, §8.4 e §8.10 permanecem aplicáveis.
+- **ADR**: —
 - **Substitui**: —
