@@ -1045,23 +1045,34 @@ Implementação: `@RestControllerAdvice` estendendo `ResponseEntityExceptionHand
 ```yaml
 resilience4j:
   circuitbreaker:
+    circuitBreakerAspectOrder: 1
     instances:
       stockService:
         slidingWindowType: COUNT_BASED
         slidingWindowSize: 10
-        minimumNumberOfCalls: 5
+        minimumNumberOfCalls: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
+        automaticTransitionFromOpenToHalfOpenEnabled: true
         permittedNumberOfCallsInHalfOpenState: 3
         registerHealthIndicator: true
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
   retry:
+    retryAspectOrder: 2
     instances:
       stockService:
         maxAttempts: 3
         waitDuration: 200ms
         enableExponentialBackoff: true
-        retryExceptions: [java.io.IOException, org.springframework.web.client.HttpServerErrorException]
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
   timelimiter:
+    timeLimiterAspectOrder: 3
     instances:
       stockService:
         timeoutDuration: 2s

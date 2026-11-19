@@ -82,6 +82,10 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-044](#d-044--contrato-rest-e-auditoria-de-clientes-na-f1) | 2026-11-19 | Contrato REST e auditoria de clientes na F1 | aceita | — |
 | [D-045](#d-045--busca-e-ordenação-da-lista-de-clientes) | 2026-11-19 | Busca e ordenação da lista de clientes | aceita | — |
 | [D-046](#d-046--alinhamento-dos-documentos-ao-contrato-de-clientes) | 2026-11-19 | Alinhamento dos documentos ao contrato de clientes | aceita | — |
+| [D-047](#d-047--dependências-da-integração-http-com-o-estoque) | 2026-11-19 | Dependências da integração HTTP com o Estoque | aceita | — |
+| [D-048](#d-048--janela-do-circuito-do-estoque) | 2026-11-19 | Janela do circuito do Estoque | aceita | — |
+| [D-049](#d-049--lotes-e-falhas-http-na-consulta-ao-estoque) | 2026-11-19 | Lotes e falhas HTTP na consulta ao Estoque | aceita | — |
+| [D-050](#d-050--alinhamento-do-exemplo-de-resiliência-do-estoque) | 2026-11-19 | Alinhamento do exemplo de resiliência do Estoque | aceita | — |
 
 ---
 
@@ -737,5 +741,61 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: a documentação da API inclui a busca, os campos das respostas e o comportamento da edição. O modelo de dados identifica a autoria das chamadas HTTP de clientes na F1.
 - **Y-statement**: no contexto da entrega da API de clientes, diante das lacunas dos documentos de referência, decidimos alinhá-los às decisões da F1-17 para documentar o contrato usado pelos consumidores.
 - **Documentos afetados**: `requisitos.md` RF-CUS-02 a RF-CUS-04 e §8.6 · `modelo-de-dados.md` §2.5.
+- **ADR**: —
+- **Substitui**: —
+
+### D-047 — Dependências da integração HTTP com o Estoque
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-18 usa as anotações Resilience4j do §8.11 e expõe as métricas exigidas por RF-RES-03 CA4. O plano permite `MockRestServiceServer` ou WireMock para testar o cliente.
+- **Opções consideradas**: testar respostas simuladas com `MockRestServiceServer` ou usar WireMock para enviar requisições HTTP reais a um servidor de testes e simular latência no transporte.
+- **Decisão**: adicionar `resilience4j-spring-boot4` 2.4.0, `spring-boot-starter-aspectj` e `micrometer-registry-prometheus` ao `billing-service`, com as versões gerenciadas pelo BOM do Spring Boot para AspectJ e Prometheus. Usar `org.wiremock:wiremock-standalone` 3.13.2 em escopo `test`.
+- **Consequências**: o Faturamento usa os aspectos e os indicadores do Resilience4j e publica métricas Prometheus. Os testes exercitam falhas e timeouts em uma conexão HTTP real.
+- **Y-statement**: no contexto da integração com o Estoque, diante da necessidade de testar timeout e retentativas, decidimos usar WireMock para exercitar o transporte HTTP, aceitando uma dependência adicional de teste.
+- **Documentos afetados**: plano local de implementação (F1-18).
+- **ADR**: —
+- **Substitui**: —
+
+### D-048 — Janela do circuito do Estoque
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-RES-03 CA2 e requisitos §6.5 descrevem cinco falhas em dez chamadas. O YAML de §8.11 configura `minimumNumberOfCalls: 5`, permitindo abrir o circuito antes de completar a primeira janela.
+- **Opções consideradas**: avaliar o limiar a partir de cinco chamadas ou esperar dez consultas e contabilizar o resultado de cada consulta após o retry.
+- **Decisão**: configurar `minimumNumberOfCalls: 10`. O `CircuitBreaker` envolve o `Retry` e registra um resultado por consulta HTTP em lote após as retentativas. O `TimeLimiter` se aplica a cada tentativa. Cinco falhas entre as últimas dez consultas abrem o circuito por 10 s. Em meio-aberto, são permitidas três consultas de teste.
+- **Consequências**: o circuito avalia a taxa com uma janela completa e oferece recuperação automática. Uma indisponibilidade imediatamente após a partida pode consumir dez consultas completas antes de abrir o circuito.
+- **Y-statement**: no contexto das consultas síncronas ao Estoque, diante da divergência sobre a primeira janela, decidimos avaliar o resultado de dez consultas completas para que as retentativas de uma mesma consulta contem uma vez, aceitando coletar dez resultados antes de abrir o circuito.
+- **Documentos afetados**: `requisitos.md` §6.5 e §8.11 (detalhamento registrado nesta decisão) · plano local de implementação (F1-18).
+- **ADR**: —
+- **Substitui**: —
+
+### D-049 — Lotes e falhas HTTP na consulta ao Estoque
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-PRD-06 e requisitos §8.6 limitam `/products/batch` a 100 IDs por requisição e omitem os IDs inexistentes. A porta do Faturamento precisa consultar listas maiores e tratar respostas HTTP 4xx do Estoque.
+- **Opções consideradas**: dividir as consultas em lotes e preservar a semântica de omissão ou impor o limite de 100 IDs ao chamador. Para 4xx, registrar falha no circuito ou devolver o erro de integração sem afetar a janela.
+- **Decisão**: dividir consultas maiores em lotes de até 100 IDs e devolver os produtos encontrados. Mapear 4xx para `503 stock-service-unavailable`, sem retentativa e sem contabilizar a resposta no circuito. Permitir até duas retentativas para timeout, falhas de rede e 5xx, com backoff exponencial conforme §8.11.
+- **Consequências**: a consulta pode realizar mais de uma requisição HTTP. Uma falha em qualquer lote encerra a consulta, e o chamador recebe um erro de integração.
+- **Y-statement**: no contexto da validação de produtos de uma nota, diante do limite do endpoint e de possíveis respostas 4xx, decidimos repartir a consulta e excluir o 4xx do circuito para respeitar o contrato do Estoque e reservar retentativas para falhas transitórias.
+- **Documentos afetados**: `requisitos.md` RF-PRD-06, RF-RES-03 e §8.11 (detalhamento registrado nesta decisão) · plano local de implementação (F1-18).
+- **ADR**: —
+- **Substitui**: —
+
+### D-050 — Alinhamento do exemplo de resiliência do Estoque
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano
+- **Contexto**: o exemplo do §8.11 ainda permitia avaliar a taxa de falhas após cinco chamadas e omitia parte da política de retentativas aprovada na F1-18.
+- **Opções consideradas**: atualizar o exemplo do §8.11 ou manter o detalhamento no registro de decisões.
+- **Decisão**: atualizar o bloco YAML do §8.11 conforme D-048 e D-049, incluindo o mínimo de dez consultas, a ordem dos aspectos, as exceções que admitem retentativa e a exclusão de respostas 4xx da janela do circuito.
+- **Consequências**: o exemplo documenta os valores do `billing-service` e permite conferir a política aplicada na F1-18.
+- **Y-statement**: no contexto da consulta síncrona ao Estoque, diante da diferença entre o exemplo e a configuração em uso, decidimos alinhar o bloco YAML para que a especificação reflita a política aprovada.
+- **Documentos afetados**: `requisitos.md` §8.11 · plano local de implementação (F1-18).
 - **ADR**: —
 - **Substitui**: —
