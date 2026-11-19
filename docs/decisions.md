@@ -70,6 +70,8 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-032](#d-032--auditoria-e-idempotência-http-de-produtos-na-f1) | 2026-11-19 | Auditoria e idempotência HTTP de produtos na F1 | aceita | — |
 | [D-033](#d-033--alinhamento-dos-documentos-ao-contrato-de-produtos) | 2026-11-19 | Alinhamento dos documentos ao contrato de produtos | aceita | — |
 | [D-034](#d-034--respostas-rest-de-movimentações-de-estoque) | 2026-11-19 | Respostas REST de movimentações de estoque | aceita | — |
+| [D-035](#d-035--motivos-e-detalhes-da-rejeição-de-baixa-por-nota) | 2026-11-19 | Motivos e detalhes da rejeição de baixa por nota | aceita | — |
+| [D-036](#d-036--nova-tentativa-para-nota-com-baixa-confirmada) | 2026-11-19 | Nova tentativa para nota com baixa confirmada | aceita | — |
 
 ---
 
@@ -557,5 +559,33 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: a resposta da gravação fornece o saldo resultante e pode ser exibida junto com os itens do histórico. A referência de nota usa campos nulos nas movimentações manuais.
 - **Y-statement**: No contexto das movimentações manuais e do histórico, diante da necessidade de exibir o saldo após cada operação, decidimos compartilhar a representação REST para devolver os mesmos dados nas duas rotas, aceitando omitir o `Location` enquanto a consulta estiver disponível pela coleção.
 - **Documentos afetados**: `requisitos.md` §3.3 e §8.6 · `modelo-de-dados.md` §2.5 e §4.3 (detalhamento registrado nesta decisão) · plano local de implementação (F1-10).
+- **ADR**: —
+- **Substitui**: —
+
+### D-035 — Motivos e detalhes da rejeição de baixa por nota
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-STK-03, RN-13 e `requisitos.md` §8.7 descrevem a rejeição e seus detalhes. O evento tem um único `reason` e pode haver itens com falhas de tipos diferentes. Um produto inexistente também deixa dois campos sem valor conhecido.
+- **Opções consideradas**: 1) usar uma ordem fixa de prioridade. 2) Usar o motivo do primeiro item com falha na ordem recebida. Ambas incluem todos os itens com falha nos detalhes.
+- **Decisão**: usar `PRODUCT_NOT_FOUND` com prioridade sobre `PRODUCT_INACTIVE`, seguido de `INSUFFICIENT_STOCK`. Incluir todos os itens com falha em `details`. Para um produto inexistente, informar `productCode` e `available` como `null`.
+- **Consequências**: o motivo geral é estável quando os mesmos itens são enviados em outra ordem. Os detalhes preservam a quantidade solicitada e os dados de estoque disponíveis para cada falha.
+- **Y-statement**: no contexto da baixa atômica, diante de falhas simultâneas em uma nota, decidimos priorizar os motivos e registrar todos os itens com falha para oferecer um resultado determinístico e preservar os dados do diagnóstico.
+- **Documentos afetados**: `requisitos.md` RF-STK-03, RN-13 e §8.7 · `modelo-de-dados.md` §4.4 (detalhamento registrado nesta decisão).
+- **ADR**: —
+- **Substitui**: —
+
+### D-036 — Nova tentativa para nota com baixa confirmada
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RN-17 e D-005 permitem uma única baixa confirmada por nota e definem a reemissão para o mesmo `printRequestId`. O contrato não define um motivo de rejeição para um identificador de tentativa inédito em uma nota que já teve baixa confirmada.
+- **Opções consideradas**: 1) tratar o evento como inconsistência técnica e encaminhá-lo ao DLT pela política existente. 2) Ignorar a solicitação e marcar o evento como processado.
+- **Decisão**: tratar uma nova tentativa para uma nota com baixa confirmada como inconsistência técnica. Reverter a transação e deixar o Kafka encaminhar o evento ao DLT pela política existente.
+- **Consequências**: a baixa confirmada permanece registrada, e a inconsistência fica disponível para diagnóstico no DLT. A reemissão do resultado para o mesmo `printRequestId` continua aplicável.
+- **Y-statement**: no contexto da idempotência da Saga, diante de uma nova tentativa para uma nota com baixa confirmada, decidimos usar a política técnica do Kafka para preservar a baixa existente e tornar o evento inconsistente visível.
+- **Documentos afetados**: `requisitos.md` RN-17 e §6.7 · `modelo-de-dados.md` §4.4 (detalhamento registrado nesta decisão).
 - **ADR**: —
 - **Substitui**: —
