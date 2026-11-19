@@ -72,6 +72,7 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-034](#d-034--respostas-rest-de-movimentações-de-estoque) | 2026-11-19 | Respostas REST de movimentações de estoque | aceita | — |
 | [D-035](#d-035--motivos-e-detalhes-da-rejeição-de-baixa-por-nota) | 2026-11-19 | Motivos e detalhes da rejeição de baixa por nota | aceita | — |
 | [D-036](#d-036--nova-tentativa-para-nota-com-baixa-confirmada) | 2026-11-19 | Nova tentativa para nota com baixa confirmada | aceita | — |
+| [D-037](#d-037--execução-local-do-estoque-no-compose) | 2026-11-19 | Execução local do Estoque no Compose | aceita | — |
 
 ---
 
@@ -587,5 +588,19 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: a baixa confirmada permanece registrada, e a inconsistência fica disponível para diagnóstico no DLT. A reemissão do resultado para o mesmo `printRequestId` continua aplicável.
 - **Y-statement**: no contexto da idempotência da Saga, diante de uma nova tentativa para uma nota com baixa confirmada, decidimos usar a política técnica do Kafka para preservar a baixa existente e tornar o evento inconsistente visível.
 - **Documentos afetados**: `requisitos.md` RN-17 e §6.7 · `modelo-de-dados.md` §4.4 (detalhamento registrado nesta decisão).
+- **ADR**: —
+- **Substitui**: —
+
+### D-037 — Execução local do Estoque no Compose
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-13 prevê acesso direto ao Estoque em `8081` antes da integração com o Gateway. A listagem padrão filtra produtos ativos (RF-PRD-02) e o seed inclui um produto inativo (`modelo-de-dados.md` §13.1).
+- **Opções consideradas**: 1) publicar o serviço em loopback, aplicar os perfis da demonstração por padrão e verificar ativos e inativos com o filtro existente. 2) Revisar a configuração de acesso ao contêiner antes de implementar.
+- **Decisão**: autorizar a alteração de `docker-compose.yml` para publicar o Estoque em `127.0.0.1:8081`, usar `docker,demo` como valor padrão de `SPRING_PROFILES_ACTIVE` e preservar o padrão de credenciais `POSTGRES_STOCK_*` da D-021. Verificar os 12 produtos com duas consultas, uma para os 11 ativos e outra com `active=false` para o inativo.
+- **Consequências**: o serviço pode ser consultado pelo host durante a demonstração local sem autenticação. O Compose permite selecionar os perfis por variável de ambiente. A verificação cobre os dois estados do filtro da API.
+- **Y-statement**: no contexto da demonstração em Docker, diante da necessidade de verificar o Estoque antes do Gateway, decidimos publicar o serviço em loopback e usar os perfis `docker,demo` por padrão para permitir que o avaliador consulte os dados de demonstração em uma subida local.
+- **Documentos afetados**: plano local de implementação (F1-13) · `docker-compose.yml` · `.env.example`.
 - **ADR**: —
 - **Substitui**: —

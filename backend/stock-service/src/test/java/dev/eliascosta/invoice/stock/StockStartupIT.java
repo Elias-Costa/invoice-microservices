@@ -54,7 +54,8 @@ class StockStartupIT {
             "V2__create_products.sql",
             "V3__create_stock_movements.sql",
             "V4__create_invoice_debits.sql",
-            "V5__create_technical_tables.sql");
+            "V5__create_technical_tables.sql",
+            "R__seed_demo.sql");
     assertThat(flyway.info().pending()).isEmpty();
     assertThat(
             jdbc.queryForObject(
@@ -65,6 +66,13 @@ class StockStartupIT {
     assertThat(entityManagerFactory.getMetamodel().getEntities())
         .<Class<?>>extracting(EntityType::getJavaType)
         .contains(OutboxEventEntity.class, ProcessedEventEntity.class, IdempotencyKeyEntity.class);
+  }
+
+  @Test
+  void leavesDemoTablesEmptyOutsideTheDemoProfile() {
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM products", Long.class)).isZero();
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM stock_movements", Long.class)).isZero();
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM invoice_debits", Long.class)).isZero();
   }
 
   @Test
