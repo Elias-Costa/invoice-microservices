@@ -76,6 +76,8 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-038](#d-038--dependências-e-migrações-iniciais-do-faturamento) | 2026-11-19 | Dependências e migrações iniciais do Faturamento | aceita | — |
 | [D-039](#d-039--histórico-e-dados-da-tentativa-de-impressão) | 2026-11-19 | Histórico e dados da tentativa de impressão | aceita | — |
 | [D-040](#d-040--limite-dos-totais-de-item-e-de-nota) | 2026-11-19 | Limite dos totais de item e de nota | aceita | — |
+| [D-041](#d-041--mapstruct-e-testes-jpa-no-faturamento) | 2026-11-19 | MapStruct e testes JPA no Faturamento | aceita | — |
+| [D-042](#d-042--limites-do-filtro-por-período-das-notas) | 2026-11-19 | Limites do filtro por período das notas | aceita | — |
 
 ---
 
@@ -647,5 +649,33 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: a validação informa qual cálculo ultrapassou o limite antes de persistir alterações. O schema e a regra de arredondamento permanecem aplicáveis.
 - **Y-statement**: no contexto do cálculo de totais, diante da possibilidade de exceder a capacidade de `numeric(15,2)`, decidimos validar cada resultado no domínio para informar o campo afetado ao usuário e preservar a nota.
 - **Documentos afetados**: `requisitos.md` RN-19 e §8.8 · `modelo-de-dados.md` §5.3 e §5.4 (detalhamento registrado nesta decisão) · plano local de implementação (F1-15).
+- **ADR**: —
+- **Substitui**: —
+
+### D-041 — MapStruct e testes JPA no Faturamento
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-16 prevê mapeadores e testes com `@DataJpaTest`. A D-028 autorizou as dependências do Estoque e configurou o processador do MapStruct no POM pai.
+- **Opções consideradas**: reutilizar a configuração da F1-08 no Faturamento ou definir uma configuração própria para o módulo.
+- **Decisão**: declarar `org.mapstruct:mapstruct` e `org.springframework.boot:spring-boot-starter-data-jpa-test` no `billing-service`, com as versões já gerenciadas e o starter em escopo `test`. Herdar o processador e as opções do MapStruct do POM pai.
+- **Consequências**: o Faturamento usa o mesmo padrão de mapeamento e de teste JPA do Estoque. A dependência do slice é usada durante os testes.
+- **Y-statement**: no contexto da persistência do Faturamento, diante da necessidade de mapear os agregados e testar o schema do Flyway, decidimos reutilizar a configuração de mapeamento e de teste da F1-08 para manter os dois serviços consistentes.
+- **Documentos afetados**: plano local de implementação (F1-16).
+- **ADR**: —
+- **Substitui**: —
+
+### D-042 — Limites do filtro por período das notas
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-INV-02 e `requisitos.md` §8.6 definem os filtros `from` e `to`, e `modelo-de-dados.md` §5.3 associa o período a `created_at`. A especificação não indicava como tratar os instantes exatamente nos limites do intervalo.
+- **Opções consideradas**: incluir os dois limites ou incluir o limite inicial e excluir o final.
+- **Decisão**: filtrar `createdAt` com `from` inclusivo e `to` exclusivo. Cada limite é opcional e pode ser usado independentemente.
+- **Consequências**: períodos adjacentes podem compartilhar um limite sem duplicar as notas emitidas exatamente naquele instante.
+- **Y-statement**: no contexto da listagem de notas por data de criação, diante da possibilidade de consultas por períodos adjacentes, decidimos incluir o início e excluir o fim para permitir combinar intervalos sem repetir registros no limite.
+- **Documentos afetados**: `requisitos.md` RF-INV-02 e §8.6 · `modelo-de-dados.md` §5.3 (detalhamento registrado nesta decisão) · plano local de implementação (F1-16).
 - **ADR**: —
 - **Substitui**: —
