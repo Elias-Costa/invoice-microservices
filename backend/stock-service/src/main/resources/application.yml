@@ -15,7 +15,12 @@ spring:
       ddl-auto: validate
     open-in-view: false
     properties:
-      hibernate.jdbc.time_zone: UTC
+      hibernate:
+        jdbc:
+          time_zone: UTC
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
   kafka:
     consumer:
       group-id: stock-service

@@ -63,6 +63,7 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-025](#d-025--dependências-maven-do-stock-service-na-f1-06) | 2026-11-19 | Dependências Maven do `stock-service` na F1-06 | aceita | — |
 | [D-026](#d-026--entrada-manual-em-produto-inativo) | 2026-11-19 | Entrada manual em produto inativo | aceita | — |
 | [D-027](#d-027--limite-de-saldo-na-entrada-manual) | 2026-11-19 | Limite de saldo na entrada manual | aceita | — |
+| [D-028](#d-028--mapstruct-e-testes-jpa-na-f1-08) | 2026-11-19 | MapStruct e testes JPA na F1-08 | aceita | — |
 
 ---
 
@@ -452,5 +453,19 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: a operação informa que a quantidade ultrapassa o limite e preserva o saldo e o histórico. A F1-10 usa o mapeamento existente do `common` para 400.
 - **Y-statement**: No contexto da entrada de estoque, diante do limite de `integer`, decidimos rejeitar a quantidade que exceda o saldo representável com `validation-error` para preservar a consistência do agregado e do histórico.
 - **Documentos afetados**: plano local de implementação (F1-07). `modelo-de-dados.md` §2.3 e §4.2 e o catálogo de `requisitos.md` §8.8 permanecem aplicáveis.
+- **ADR**: —
+- **Substitui**: —
+
+### D-028 — MapStruct e testes JPA na F1-08
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano
+- **Contexto**: a F1-08 introduz os primeiros mapeamentos de persistência e os testes com `@DataJpaTest`. A partir do JDK 23, a descoberta de processadores no classpath exige configuração explícita para que eles sejam executados.
+- **Opções consideradas**: 1) configurar o processador apenas no módulo de Estoque; 2) centralizar o caminho do processador e as opções de geração no plugin de compilação do POM pai.
+- **Decisão**: declarar `org.mapstruct:mapstruct` no `stock-service` com a versão 1.6.3 gerenciada pelo POM pai. Configurar `org.mapstruct:mapstruct-processor` em `annotationProcessorPaths` do `maven-compiler-plugin` no POM pai, com versão explícita `${mapstruct.version}` e uso exclusivo como processador. Definir `-Amapstruct.defaultComponentModel=spring` e `-Amapstruct.unmappedTargetPolicy=ERROR` em `compilerArgs`. Usar `spring-boot-starter-data-jpa-test` em escopo `test` com a versão gerenciada pelo BOM. Incluir `org.mapstruct` na regra do `StockArchitectureTest` que protege o domínio de dependências de framework.
+- **Consequências**: os módulos herdam o processamento explícito e as mesmas opções de geração. Os mapeadores gerados são componentes Spring e campos de destino esquecidos interrompem a compilação. ArchUnit verifica a independência do domínio em relação ao MapStruct.
+- **Y-statement**: No contexto da persistência JPA, diante da necessidade de geração explícita e consistente dos mapeadores, decidimos configurar o processador no POM pai para reproduzir a compilação e detectar omissões nos mapeamentos, com as mesmas opções de geração para todos os módulos.
+- **Documentos afetados**: plano local de implementação (F1-08).
 - **ADR**: —
 - **Substitui**: —

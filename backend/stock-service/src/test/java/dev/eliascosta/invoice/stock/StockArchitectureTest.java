@@ -26,6 +26,7 @@ class StockArchitectureTest {
             "org.springframework..",
             "jakarta.persistence..",
             "org.apache.kafka..",
+            "org.mapstruct..",
             "com.fasterxml.jackson..",
             "tools.jackson..")
         .allowEmptyShould(true)
