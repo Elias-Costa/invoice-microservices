@@ -235,17 +235,18 @@ Cada requisito traz prioridade (MoSCoW), fase de entrega e critérios de aceite 
 - CA5: Na UI, formulário reativo tipado com validação síncrona e mensagens de erro por campo; código é convertido para maiúsculas.
 
 **RF-PRD-02 — Listar produtos.** Listagem paginada e ordenável com busca textual por código/descrição e filtro por ativo/inativo.
-- CA1: `GET /api/stock/products?search=par&active=true&page=0&size=20&sort=code,asc` retorna página com `content`, `totalElements`, `totalPages`, `number`, `size`.
+- CA1: `GET /api/stock/products?search=par&active=true&page=0&size=20&sort=code,asc` retorna `{content, page: {number, size, totalElements, totalPages}}`.
 - CA2: Busca é case-insensitive e parcial (`ILIKE %termo%`).
 - CA3: Na UI, tabela Material com paginação server-side, ordenação e campo de busca com `debounceTime(300)` + `distinctUntilChanged` + `switchMap`.
 - CA4: Produtos com saldo zero são destacados visualmente.
 
-**RF-PRD-03 — Consultar produto.** Detalhe com dados cadastrais, saldo atual e histórico de movimentações (RF-STK-02).
+**RF-PRD-03 — Consultar produto.** O detalhe retorna os dados cadastrais e o saldo atual. A tela consulta o histórico pela rota paginada do RF-STK-02.
 - CA1: `GET /api/stock/products/{id}` → `200`; id inexistente → `404` (`product-not-found`).
 
 **RF-PRD-04 — Editar produto.** Permite alterar `description` e `unitPrice`. `code` é imutável; `balance` só muda por movimentação.
 - CA1: `PUT /api/stock/products/{id}` com `code` diferente do atual → `400` (`field-immutable`).
 - CA2: Edição concorrente (versão desatualizada) → `409` (`optimistic-lock-conflict`) e a UI oferece recarregar.
+- CA3: Enviar `balance` no `PUT` → `400` (`field-immutable`).
 
 **RF-PRD-05 — Inativar e reativar produto.** Exclusão é lógica (`active = false`).
 - CA1: `DELETE /api/stock/products/{id}` → `204`; produto some das listagens padrão (`active=true`) mas continua acessível por id.
@@ -441,7 +442,7 @@ Cada requisito traz prioridade (MoSCoW), fase de entrega e critérios de aceite 
 | RN-13 | Saldo insuficiente em qualquer item rejeita a nota inteira, detalhando cada item insuficiente (solicitado × disponível). | Estoque |
 | RN-14 | Cancelamento não afeta o estoque (nunca houve baixa). | Faturamento |
 | RN-15 | `CLOSED` e `CANCELED` são estados terminais. | Faturamento |
-| RN-16 | Requisições `POST` de criação/ação exigem header `Idempotency-Key` (UUID). Mesma chave + mesmo payload → mesma resposta; mesma chave + payload diferente → `422`; chave em processamento → `409`. Chaves expiram em 24 h. | Todos os serviços |
+| RN-16 | Requisições `POST` marcadas com `IK` em §8.6 exigem o header `Idempotency-Key` (UUID). Mesma chave e mesmo payload retornam a mesma resposta. Mesma chave com payload diferente retorna `422`. Chave em processamento retorna `409`. Chaves expiram em 24 h. | Todos os serviços |
 | RN-17 | A baixa de estoque para uma nota é processada no máximo uma vez: eventos são deduplicados por `eventId` e solicitações por `printRequestId`; uma nota só pode ter uma baixa confirmada. | Estoque |
 | RN-18 | O item da nota guarda snapshot de código, descrição e preço unitário do produto no momento da inclusão; alterações posteriores no produto não afetam notas existentes. | Faturamento |
 | RN-19 | Total do item = `quantity × unitPrice`; total da nota = soma dos itens. Escala 2, arredondamento `HALF_UP`. | Faturamento |
@@ -920,6 +921,10 @@ Todas as rotas abaixo são acessadas via gateway com o prefixo indicado. Respost
 | PUT | `/admin/chaos` | ADMIN | | 200 | Configura chaos |
 | GET | `/actuator/health` | público | | 200 | Saúde |
 
+O `stock-service` expõe as rotas de produtos com o prefixo `/api/stock`, preservado pelo gateway. As respostas de produto incluem `id`, `code`, `description`, `unitPrice`, `balance`, `active` e `version`. A consulta em lote usa os campos de RF-PRD-06.
+
+A listagem usa `active=true` por padrão e aceita ordenar por `code`, `description`, `unitPrice`, `balance` ou `active`. A ordenação padrão é `code,asc`. Campo ou direção inválidos retornam `400 validation-error`.
+
 **billing-service — prefixo `/api/billing`**
 
 | Método | Rota | Perfis | IK | Sucesso | Descrição |
@@ -989,7 +994,7 @@ Todo erro retorna `application/problem+json`:
 | `type` (slug) | Status | Origem |
 |---|---|---|
 | `validation-error` | 400 | Bean Validation / formato |
-| `field-immutable` | 400 | Tentativa de alterar `code`/`document` |
+| `field-immutable` | 400 | Tentativa de alterar `code` ou `document`, ou de enviar `balance` na edição de produto |
 | `duplicate-invoice-item` | 400 | RN-08 |
 | `unauthorized` | 401 | Token ausente/inválido |
 | `forbidden` | 403 | Role insuficiente |
@@ -1010,7 +1015,7 @@ Implementação: `@RestControllerAdvice` estendendo `ResponseEntityExceptionHand
 
 ### 8.9 Idempotência HTTP
 
-- Header `Idempotency-Key: <UUID v4>` obrigatório nos `POST` marcados; ausência → `400`.
+- Header `Idempotency-Key: <UUID>` obrigatório nos `POST` marcados em §8.6. Ausência ou formato inválido → `400`.
 - Chave é escopada por usuário (`sub` do JWT) e rota.
 - Fluxo: `INSERT idempotency_keys (state = IN_FLIGHT)` → executa → `UPDATE (state = COMPLETED, response)`; conflito de `INSERT` → verifica `state`/`hash` → responde conforme RN-16.
 - Implementado como `HandlerInterceptor` + `ContentCachingResponseWrapper` no módulo `common`; anotação `@Idempotent` nos handlers.

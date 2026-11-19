@@ -64,6 +64,11 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-026](#d-026--entrada-manual-em-produto-inativo) | 2026-11-19 | Entrada manual em produto inativo | aceita | — |
 | [D-027](#d-027--limite-de-saldo-na-entrada-manual) | 2026-11-19 | Limite de saldo na entrada manual | aceita | — |
 | [D-028](#d-028--mapstruct-e-testes-jpa-na-f1-08) | 2026-11-19 | MapStruct e testes JPA na F1-08 | aceita | — |
+| [D-029](#d-029--encerramento-da-implementação-na-f1) | 2026-11-19 | Encerramento da implementação na F1 | aceita | — |
+| [D-030](#d-030--starter-de-testes-mvc-do-estoque) | 2026-11-19 | Starter de testes MVC do Estoque | aceita | — |
+| [D-031](#d-031--contrato-rest-de-produtos-na-f1-09) | 2026-11-19 | Contrato REST de produtos na F1-09 | aceita | — |
+| [D-032](#d-032--auditoria-e-idempotência-http-de-produtos-na-f1) | 2026-11-19 | Auditoria e idempotência HTTP de produtos na F1 | aceita | — |
+| [D-033](#d-033--alinhamento-dos-documentos-ao-contrato-de-produtos) | 2026-11-19 | Alinhamento dos documentos ao contrato de produtos | aceita | — |
 
 ---
 
@@ -467,5 +472,75 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: os módulos herdam o processamento explícito e as mesmas opções de geração. Os mapeadores gerados são componentes Spring e campos de destino esquecidos interrompem a compilação. ArchUnit verifica a independência do domínio em relação ao MapStruct.
 - **Y-statement**: No contexto da persistência JPA, diante da necessidade de geração explícita e consistente dos mapeadores, decidimos configurar o processador no POM pai para reproduzir a compilação e detectar omissões nos mapeamentos, com as mesmas opções de geração para todos os módulos.
 - **Documentos afetados**: plano local de implementação (F1-08).
+- **ADR**: —
+- **Substitui**: —
+
+### D-029 — Encerramento da implementação na F1
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano
+- **Contexto**: o plano de entrega em `requisitos.md` §11 previa três fases até a `v1.0.0`. A F1 já prevê uma demonstração ponta a ponta do fechamento de notas e da baixa de estoque, com cenários de concorrência, idempotência e recuperação após indisponibilidade do Estoque.
+- **Opções consideradas**: 1) implementar F1, F2 e F3, ampliando as capacidades demonstradas e o esforço de implementação. 2) concluir a F1 e apresentar a `v0.1.0`, concentrando o esforço no fluxo principal e na demonstração local.
+- **Decisão**: (2). Encerrar a implementação ao concluir a F1 e apresentar a `v0.1.0` como a entrega do portfólio. Para esse objetivo, o custo adicional de F2 e F3 supera o ganho esperado.
+- **Consequências**: o encerramento acontece na F1, com a demonstração e o README previstos na F1-30. F2 e F3 ficam como evoluções possíveis fora do escopo da entrega. A `v0.1.0` é uma demonstração local sem autenticação e sem geração de PDF.
+- **Y-statement**: no contexto de um projeto de portfólio, diante do custo de implementar as fases adicionais, decidimos encerrar a implementação na F1 e apresentar a `v0.1.0` para demonstrar o fluxo central de ponta a ponta, aceitando deixar as capacidades da F2 e da F3 para possíveis evoluções.
+- **Documentos afetados**: plano local de implementação (§2, F1-30, §5 e §6) · `requisitos.md` §11 (alinhamento pendente de confirmação) · `README.md` (previsto na F1-30).
+- **ADR**: —
+- **Substitui**: —
+
+### D-030 — Starter de testes MVC do Estoque
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-09 exige testes `@WebMvcTest`. O `stock-service` já tem o starter base de testes, e o `common` declara o starter MVC no próprio escopo de teste.
+- **Opções consideradas**: 1) usar o mesmo starter no Estoque para exercitar o slice MVC. 2) Revisar a estratégia de testes e usar somente o contexto completo.
+- **Decisão**: declarar `spring-boot-starter-webmvc-test` no `stock-service`, com escopo `test` e versão gerenciada pelo BOM do Spring Boot.
+- **Consequências**: os testes de contrato HTTP executam com um slice MVC. A dependência é usada durante o build de testes.
+- **Y-statement**: No contexto dos testes da API de produtos, diante da necessidade de validar o contrato HTTP em um slice, decidimos usar o starter MVC de testes gerenciado pelo BOM para executar `@WebMvcTest`.
+- **Documentos afetados**: plano local de implementação (F1-09).
+- **ADR**: —
+- **Substitui**: —
+
+### D-031 — Contrato REST de produtos na F1-09
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: `requisitos.md` §8.6 define o prefixo público e a estrutura de paginação. RF-PRD-03 remete ao histórico, e a F1-10 entrega sua rota paginada. Os campos da resposta individual, a lista de campos ordenáveis e o tratamento de `balance` no `PUT` precisavam de definição.
+- **Opções consideradas**: 1) preservar o prefixo do Estoque em todo o percurso, usar o endpoint específico para o histórico e explicitar o contrato de produto. 2) Reescrever o prefixo no gateway ou incorporar o histórico no detalhe.
+- **Decisão**: expor `/api/stock/products` no `stock-service` e preservar o prefixo no Gateway. Usar `id`, `code`, `description`, `unitPrice`, `balance`, `active` e `version` nas respostas de produto. No lote, usar os seis campos do RF-PRD-06. Consultar o histórico em `GET /api/stock/products/{id}/movements`, da F1-10. Permitir ordenação por `code`, `description`, `unitPrice`, `balance` e `active`. O padrão é `code,asc` e uma ordenação inválida retorna `400`. Se o `PUT` receber `balance`, responder `400 field-immutable`.
+- **Consequências**: o `Location` do cadastro pode usar o mesmo caminho acessível pelo serviço e pelo gateway. O cliente faz uma consulta paginada ao abrir o histórico. Alterações de saldo passam pelos casos de uso de movimentação.
+- **Y-statement**: No contexto da integração do Estoque com seus consumidores, diante dos detalhes de contrato ainda em aberto, decidimos fixar a rota, os campos e os critérios de edição e ordenação, para que a API direta e a integração usem as mesmas convenções.
+- **Documentos afetados**: plano local de implementação (F1-09 e F1-22) · `requisitos.md` §3.2 e §8.6 (detalhamento registrado nesta decisão).
+- **ADR**: —
+- **Substitui**: —
+
+### D-032 — Auditoria e idempotência HTTP de produtos na F1
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1 roda sem autenticação (D-029). `modelo-de-dados.md` §2.5 define a auditoria com usuário autenticado e operações internas. Em `requisitos.md`, RN-16 usa uma formulação geral para POSTs, §8.6 marca só o cadastro entre as rotas de produtos da F1-09 e §8.9 cita UUID v4. O `common` valida o formato UUID.
+- **Opções consideradas**: 1) seguir a tabela de §8.6 e reutilizar `anonymous` e a validação existente. 2) Exigir a chave também na reativação ou restringir as chaves a UUID v4.
+- **Decisão**: usar `anonymous` na auditoria de operações HTTP de produtos da F1. Entre as rotas da F1-09, exigir `Idempotency-Key` no cadastro, aceitando UUID conforme a validação já implementada no `common`.
+- **Consequências**: o cadastro reutiliza o tratamento de repetição do `common`. A reativação pode ser chamada sem a chave. Os registros de auditoria das chamadas ao MVP ficam identificados como anônimos.
+- **Y-statement**: No contexto do Estoque sem autenticação, diante da diferença entre as regras gerais e a tabela de endpoints, decidimos adotar a regra explícita da tabela, o formato de chave já validado e uma identidade anônima, para integrar a API ao `common` na F1.
+- **Documentos afetados**: plano local de implementação (F1-09) · `requisitos.md` RN-16 e §8.9 · `modelo-de-dados.md` §2.5 (alinhamento textual pendente de confirmação).
+- **ADR**: —
+- **Substitui**: —
+
+### D-033 — Alinhamento dos documentos ao contrato de produtos
+
+- **Data**: 2026-11-19
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: D-031 e D-032 definiram os detalhes da API de produtos aplicados na F1-09. Os documentos de referência ainda continham formulações anteriores sobre histórico, erros de edição, chaves idempotentes e autoria.
+- **Opções consideradas**: 1) alinhar ambos os documentos. 2) Manter os detalhes no registro de decisões.
+- **Decisão**: atualizar `requisitos.md` e `modelo-de-dados.md` para refletir D-031 e D-032.
+- **Consequências**: os documentos passam a descrever a rota de histórico, os campos e a ordenação, os `POST` que exigem chave, o formato UUID e a autoria `anonymous` no Estoque da F1.
+- **Y-statement**: No contexto da entrega da API de produtos, diante da diferença entre a especificação anterior e o contrato aprovado, decidimos alinhar os documentos de referência para que os consumidores tenham a mesma descrição aplicada pelo serviço.
+- **Documentos afetados**: `requisitos.md` §3.2, RN-16, §8.6, §8.8 e §8.9 · `modelo-de-dados.md` §2.5 (atualizados em 2026-11-19).
 - **ADR**: —
 - **Substitui**: —

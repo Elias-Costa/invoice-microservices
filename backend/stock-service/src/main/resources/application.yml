@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: stock-service
+  jackson:
+    deserialization:
+      accept-float-as-int: false
+    mapper:
+      allow-coercion-of-scalars: false
   datasource:
     username: ${POSTGRES_STOCK_USER:stock_user}
     password: ${POSTGRES_STOCK_PASSWORD:stock_pass}

@@ -107,6 +107,8 @@ Todas as tabelas de agregados possuem:
 
 Tabelas append-only (`stock_movements`, `invoice_status_history`, `processed_events`) têm apenas `created_*`/`*_at`.
 
+Na F1, as operações HTTP de produtos do Estoque registram `anonymous` na auditoria. No cadastro, o produto e a movimentação `INITIAL` recebem o mesmo autor.
+
 ### 2.6 Exclusão lógica
 
 `products` e `customers` nunca são apagados; `active = false` marca inativação. Não há coluna `deleted_at` — o conceito de negócio é "inativo", não "excluído". Tabelas de fatos (`invoices`, `stock_movements`) nunca são apagadas.
