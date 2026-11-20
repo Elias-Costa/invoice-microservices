@@ -1,12 +1,12 @@
 # Infra local do invoice-microservices — requisitos.md §8.2/§8.13, RNF-RUN-01, RNF-RES-06.
 #
-#   docker compose up --build -d            # postgres-stock, postgres-billing, kafka, stock-service
+#   docker compose up --build -d            # bancos, Kafka, Estoque e Faturamento
 #   docker compose --profile tools up -d    # + Kafka UI em http://localhost:8090
 #   docker compose down                     # NUNCA use -v sem confirmar: apaga os bancos
 #
 # Variáveis: .env.example lista todas; os defaults abaixo são os mesmos valores, então a stack
 # sobe sem `.env`. Portas de bancos e Kafka são publicadas apenas em 127.0.0.1 (D-018).
-# billing-service, api-gateway e frontend entram nas tarefas seguintes.
+# api-gateway e frontend entram nas tarefas seguintes.
 # Keycloak e observabilidade ficam previstos na Fase 2.
 
 name: invoice-microservices
@@ -122,6 +122,26 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker,demo}
       POSTGRES_STOCK_USER: ${POSTGRES_STOCK_USER:-stock_user}
       POSTGRES_STOCK_PASSWORD: ${POSTGRES_STOCK_PASSWORD:-stock_pass}
+
+  billing-service:
+    build:
+      context: ./backend
+      dockerfile: billing-service/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres-billing:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      stock-service:
+        condition: service_healthy
+    networks: [internal]
+    ports:
+      - "127.0.0.1:8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker,demo}
+      POSTGRES_BILLING_USER: ${POSTGRES_BILLING_USER:-billing_user}
+      POSTGRES_BILLING_PASSWORD: ${POSTGRES_BILLING_PASSWORD:-billing_pass}
 
   kafka-ui:
     image: ghcr.io/kafbat/kafka-ui:v1.5.0

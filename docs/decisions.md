@@ -91,6 +91,8 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-053](#d-053--edição-período-e-auditoria-da-api-de-notas) | 2026-11-19 | Edição, período e auditoria da API de notas | aceita | — |
 | [D-054](#d-054--mensagem-de-rejeição-do-fechamento) | 2026-11-20 | Mensagem de rejeição do fechamento | aceita | — |
 | [D-055](#d-055--resultado-de-baixa-para-nota-inexistente) | 2026-11-20 | Resultado de baixa para nota inexistente | aceita | — |
+| [D-056](#d-056--execução-local-do-faturamento-no-compose) | 2026-11-20 | Execução local do Faturamento no Compose | aceita | — |
+| [D-057](#d-057--sequência-de-notas-no-seed-do-faturamento) | 2026-11-20 | Sequência de notas no seed do Faturamento | aceita | — |
 
 ---
 
@@ -872,5 +874,33 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: a mensagem fica disponível para diagnóstico com os dados originais após as retentativas da política existente.
 - **Y-statement**: no contexto dos resultados da Saga, diante de uma referência a uma nota inexistente, decidimos usar a política de falhas do Kafka para tornar a inconsistência visível.
 - **Documentos afetados**: `requisitos.md` §6.7 e §8.7 (detalhamento registrado nesta decisão).
+- **ADR**: —
+- **Substitui**: —
+
+### D-056 — Execução local do Faturamento no Compose
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-21 prevê executar o Faturamento no Compose, carregar os dados de `modelo-de-dados.md` §13.4–13.6 e verificar a API local antes da tarefa do Gateway. A D-037 definiu o padrão local do Estoque.
+- **Opções consideradas**: 1) publicar o Faturamento em loopback, reutilizar os perfis do Estoque e adicionar o seed repetível. 2) manter o Compose e as migrações na configuração atual.
+- **Decisão**: autorizar `docker-compose.yml` com o Faturamento em `127.0.0.1:8082`, os perfis Spring `docker,demo` por padrão, credenciais `POSTGRES_BILLING_*` conforme D-021 e URL interna `http://stock-service:8081`. Autorizar `R__seed_demo.sql` no perfil `demo`.
+- **Consequências**: o Compose sobe o Faturamento com as dependências locais e a API permite consultar as cinco notas de demonstração pelo host.
+- **Y-statement**: no contexto da demonstração anterior ao Gateway, decidimos publicar o Faturamento em loopback com dados de demonstração para permitir a verificação da API local.
+- **Documentos afetados**: plano local de implementação (F1-21) · `docker-compose.yml`.
+- **ADR**: —
+- **Substitui**: —
+
+### D-057 — Sequência de notas no seed do Faturamento
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: `modelo-de-dados.md` §13.5 e Apêndice A.4 preveem `setval('invoice_number_seq', 5)` para que a primeira nota após o seed seja a nº 6. Um ajuste incondicional pode fazer a sequência voltar ao reexecutar a migração repetível.
+- **Opções consideradas**: 1) usar 5 como mínimo, manter a sequência se já estiver adiantada e falhar se uma nota alheia ao seed ocupar um número reservado. 2) aplicar `setval(..., 5)` em todas as execuções.
+- **Decisão**: usar 5 como mínimo para a sequência e preservar numerações emitidas. Interromper o seed se um dos números de 1 a 5 estiver ocupado por uma nota diferente da prevista para aquele número.
+- **Consequências**: a primeira nota de um banco recém-populado recebe o nº 6. Reexecutar o seed preserva o avanço da sequência. Um conflito com os números da demonstração precisa ser resolvido antes de ativar o perfil `demo` naquele banco.
+- **Y-statement**: no contexto de um seed repetível com números fixos, decidimos limitar o ajuste da sequência a avanços e rejeitar conflitos nos números 1–5 para preservar as notas do banco.
+- **Documentos afetados**: `modelo-de-dados.md` §13.5 e Apêndice A.4 · plano local de implementação (F1-21).
 - **ADR**: —
 - **Substitui**: —

@@ -871,7 +871,7 @@ Documentos com dígitos verificadores válidos.
 | 4 | `b…04` | #4 | `OPEN` | `TRE-5M` × 1 @ 22,00; `FIT-ISO-19` × 5 @ 4,50 | 44,50 | **Concorrência** (imprimir junto com a 3) |
 | 5 | `b…05` | #5 | `OPEN` | `BRO-ACO-8` × 2 @ 8,75; `LIX-120` × 10 @ 1,80 | 35,50 | **Saldo insuficiente** (rejeição com detalhe) |
 
-Após o seed: `SELECT setval('invoice_number_seq', 5)`.
+Após o seed, a sequência fica no mínimo em 5 e a primeira nota criada em um banco recém-populado recebe o nº 6. A reexecução preserva o avanço da sequência. O seed é interrompido se uma nota diferente da prevista já ocupar um dos números 1–5 (D-057).
 
 ### 13.6 Histórico de status (`billing_db.invoice_status_history`)
 
@@ -1210,4 +1210,4 @@ INSERT INTO invoice_debits (print_request_id, invoice_id, invoice_number, reques
 ON CONFLICT DO NOTHING;
 ```
 
-O seed de `billing_db` segue o mesmo padrão (clientes `c…01–05`, notas `b…01–05`, itens e histórico com ids fixos) e termina com `SELECT setval('invoice_number_seq', 5);`. Todos os `INSERT` usam ids fixos e `ON CONFLICT (id) DO NOTHING`, de modo que a migração `R__` pode ser reexecutada (quando seu checksum muda) sem duplicar dados.
+O seed de `billing_db` segue o mesmo padrão (clientes `c…01–05`, notas `b…01–05`, itens e histórico com ids fixos). Os `INSERT` do Faturamento usam `ON CONFLICT (id) DO NOTHING` para permitir a reexecução da migração `R__`. O seed verifica conflitos nos números reservados de 1 a 5 e avança `invoice_number_seq` até 5 se necessário, conforme §13.5 (D-057).

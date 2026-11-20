@@ -55,8 +55,14 @@ class BillingStartupIT {
             "V3__create_invoices.sql",
             "V4__create_invoice_items.sql",
             "V5__create_invoice_status_history.sql",
-            "V6__create_technical_tables.sql");
+            "V6__create_technical_tables.sql",
+            "R__seed_demo.sql");
     assertThat(flyway.info().pending()).isEmpty();
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM customers", Long.class)).isZero();
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM invoices", Long.class)).isZero();
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM invoice_items", Long.class)).isZero();
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM invoice_status_history", Long.class))
+        .isZero();
     assertThat(
             jdbc.queryForObject(
                 "SELECT extname FROM pg_extension WHERE extname = 'pg_trgm'", String.class))
