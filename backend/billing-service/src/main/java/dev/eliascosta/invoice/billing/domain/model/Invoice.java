@@ -17,6 +17,8 @@ import java.util.UUID;
 
 public final class Invoice {
 
+  public static final int MAX_FAILURE_REASON_LENGTH = 500;
+
   private static final String SYSTEM_ACTOR = "system";
 
   private final UUID id;
@@ -81,7 +83,7 @@ public final class Invoice {
     this.lastFailureReason =
         lastFailureReason == null
             ? null
-            : requiredText(lastFailureReason, "lastFailureReason", 500);
+            : requiredText(lastFailureReason, "lastFailureReason", MAX_FAILURE_REASON_LENGTH);
     this.cancelReason =
         cancelReason == null ? null : requiredText(cancelReason, "cancelReason", 500);
     this.version = version;
@@ -153,7 +155,7 @@ public final class Invoice {
 
   public void rejectClose(String reason, Instant changedAt) {
     requireStatus(InvoiceStatus.PROCESSING);
-    String validatedReason = requiredText(reason, "reason", 500);
+    String validatedReason = requiredText(reason, "reason", MAX_FAILURE_REASON_LENGTH);
     transitionTo(InvoiceStatus.OPEN, validatedReason, SYSTEM_ACTOR, changedAt);
     lastFailureReason = validatedReason;
     processingStartedAt = null;

@@ -89,6 +89,8 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-051](#d-051--referências-inexistentes-na-api-de-notas) | 2026-11-19 | Referências inexistentes na API de notas | aceita | — |
 | [D-052](#d-052--respostas-e-ordenação-da-api-de-notas) | 2026-11-19 | Respostas e ordenação da API de notas | aceita | — |
 | [D-053](#d-053--edição-período-e-auditoria-da-api-de-notas) | 2026-11-19 | Edição, período e auditoria da API de notas | aceita | — |
+| [D-054](#d-054--mensagem-de-rejeição-do-fechamento) | 2026-11-20 | Mensagem de rejeição do fechamento | aceita | — |
+| [D-055](#d-055--resultado-de-baixa-para-nota-inexistente) | 2026-11-20 | Resultado de baixa para nota inexistente | aceita | — |
 
 ---
 
@@ -842,5 +844,33 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: a edição exige a versão lida pelo consumidor e informa explicitamente a tentativa de alterar o cliente. Um intervalo vazio usa o formato normal de paginação.
 - **Y-statement**: no contexto da edição e da listagem de notas na F1, diante das lacunas na autoria e nos parâmetros, decidimos explicitar a imutabilidade do cliente, o controle de versão e a resposta de um período vazio para que o consumidor possa tratar esses casos.
 - **Documentos afetados**: `requisitos.md` RF-INV-02, RF-INV-04 e §8.6–8.8 · `modelo-de-dados.md` §2.5, §2.7 e §5.3 · plano local de implementação (F1-19).
+- **ADR**: —
+- **Substitui**: —
+
+### D-054 — Mensagem de rejeição do fechamento
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-PRT-04 exige um motivo legível. D-035 define um motivo geral e detalhes por item, e `modelo-de-dados.md` §5.3 e §5.5 limita cada texto persistido a 500 caracteres.
+- **Opções consideradas**: apresentar os detalhes que couberem no limite, mostrar apenas o primeiro item ou apresentar apenas o motivo geral e o total de itens afetados.
+- **Decisão**: traduzir o motivo geral e listar, na ordem do evento, código ou UUID e quantidades dos itens. Omitir os itens finais que excederiam 500 caracteres e indicar quantos ficaram de fora. Usar o mesmo texto em `lastFailureReason` e no histórico.
+- **Consequências**: os detalhes cabem nas colunas existentes e os eventos Kafka preservam a lista completa.
+- **Y-statement**: no contexto de uma rejeição com vários itens, diante do limite de armazenamento, decidimos priorizar os detalhes na ordem do evento e indicar as omissões para manter a mensagem legível.
+- **Documentos afetados**: `requisitos.md` RF-PRT-04 · `modelo-de-dados.md` §5.3 e §5.5 (detalhamento registrado nesta decisão).
+- **ADR**: —
+- **Substitui**: —
+
+### D-055 — Resultado de baixa para nota inexistente
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: D-005 define quando uma tentativa de impressão está obsoleta. O plano F1-20 e `requisitos.md` §6.7 não dizem como tratar um resultado bem-formado cujo `invoiceId` não existe no Faturamento.
+- **Opções consideradas**: reverter a transação e usar a política de DLT do Kafka ou ignorar o resultado com registro em `processed_events`.
+- **Decisão**: tratar a referência inexistente como inconsistência técnica. Reverter a transação, inclusive a marca de deduplicação, e deixar a política Kafka encaminhar a mensagem ao DLT.
+- **Consequências**: a mensagem fica disponível para diagnóstico com os dados originais após as retentativas da política existente.
+- **Y-statement**: no contexto dos resultados da Saga, diante de uma referência a uma nota inexistente, decidimos usar a política de falhas do Kafka para tornar a inconsistência visível.
+- **Documentos afetados**: `requisitos.md` §6.7 e §8.7 (detalhamento registrado nesta decisão).
 - **ADR**: —
 - **Substitui**: —

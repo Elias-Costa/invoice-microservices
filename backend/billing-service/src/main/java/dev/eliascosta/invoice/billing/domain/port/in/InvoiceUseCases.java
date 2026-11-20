@@ -19,11 +19,15 @@ public interface InvoiceUseCases {
 
   Invoice cancel(Cancel command);
 
+  Invoice print(Print command);
+
   record Create(UUID customerId, List<Item> items, String createdBy) {}
 
   record ReplaceItems(UUID id, List<Item> items, long version, String updatedBy) {}
 
   record Cancel(UUID id, String reason, String updatedBy) {}
+
+  record Print(UUID id, String requestedBy) {}
 
   record Item(UUID productId, Quantity quantity) {}
 }

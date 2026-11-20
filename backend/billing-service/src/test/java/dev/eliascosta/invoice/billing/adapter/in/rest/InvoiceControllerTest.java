@@ -1,14 +1,19 @@
 package dev.eliascosta.invoice.billing.adapter.in.rest;
 
 import static dev.eliascosta.invoice.billing.adapter.in.rest.InvoiceController.PATH;
+import static dev.eliascosta.invoice.common.idempotency.Idempotent.HEADER;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import dev.eliascosta.invoice.billing.domain.model.Invoice;
 import dev.eliascosta.invoice.billing.domain.model.InvoiceStatus;
 import dev.eliascosta.invoice.billing.domain.port.PageResult;
 import dev.eliascosta.invoice.billing.domain.port.in.InvoiceUseCases;
@@ -29,6 +34,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(InvoiceController.class)
@@ -164,5 +170,25 @@ class InvoiceControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errors[0].field").value("reason"));
     verifyNoInteractions(invoices);
+  }
+
+  @Test
+  void acceptsPrintAndReturnsOnlyTheInvoiceIdAndProcessingStatus() throws Exception {
+    Invoice processing = mock(Invoice.class);
+    when(processing.getId()).thenReturn(INVOICE);
+    when(processing.getStatus()).thenReturn(InvoiceStatus.PROCESSING);
+    when(invoices.print(new InvoiceUseCases.Print(INVOICE, "anonymous"))).thenReturn(processing);
+
+    mvc.perform(post(PATH + "/{id}/print", INVOICE).header(HEADER, UUID.randomUUID().toString()))
+        .andExpect(status().isAccepted())
+        .andExpect(header().string("Location", PATH + "/" + INVOICE))
+        .andExpect(
+            content()
+                .json(
+                    """
+                    {"id":"%s","status":"PROCESSING"}
+                    """
+                        .formatted(INVOICE),
+                    JsonCompareMode.STRICT));
   }
 }

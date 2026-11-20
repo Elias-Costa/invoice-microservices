@@ -35,6 +35,7 @@ record InvoiceResponse(
 
   enum Action {
     EDIT_ITEMS,
-    CANCEL
+    CANCEL,
+    PRINT
   }
 }

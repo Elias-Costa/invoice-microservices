@@ -101,4 +101,13 @@ class InvoiceController {
   InvoiceResponse cancel(@PathVariable UUID id, @Valid @RequestBody CancelInvoiceRequest request) {
     return mapper.toResponse(invoices.cancel(mapper.toCancel(id, request, AUDIT_USER)));
   }
+
+  @PostMapping("/{id}/print")
+  @Idempotent
+  ResponseEntity<PrintInvoiceResponse> print(@PathVariable UUID id) {
+    var invoice = invoices.print(new InvoiceUseCases.Print(id, AUDIT_USER));
+    return ResponseEntity.accepted()
+        .location(URI.create(PATH + "/" + id))
+        .body(mapper.toPrintResponse(invoice));
+  }
 }

@@ -122,7 +122,7 @@ class InvoiceApiIT {
             .andExpect(jsonPath("$.items[1].lineOrder").value(2))
             .andExpect(jsonPath("$.total").value(57.1))
             .andExpect(jsonPath("$.version").value(0))
-            .andExpect(jsonPath("$.allowedActions", contains("EDIT_ITEMS", "CANCEL")))
+            .andExpect(jsonPath("$.allowedActions", contains("EDIT_ITEMS", "CANCEL", "PRINT")))
             .andReturn()
             .getResponse();
     var createdBody = body(created);
@@ -401,7 +401,7 @@ class InvoiceApiIT {
     mvc.perform(get(PATH + "/{id}", reopened.getId()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.lastFailureReason").value("Saldo insuficiente"))
-        .andExpect(jsonPath("$.allowedActions", contains("EDIT_ITEMS", "CANCEL")));
+        .andExpect(jsonPath("$.allowedActions", contains("EDIT_ITEMS", "CANCEL", "PRINT")));
     stock.verify(0, getRequestedFor(urlPathEqualTo(STOCK_BATCH_PATH)));
   }
 

@@ -21,6 +21,8 @@ interface InvoiceRestMapper {
   @Mapping(target = "allowedActions", source = "status")
   InvoiceResponse toResponse(Invoice invoice);
 
+  PrintInvoiceResponse toPrintResponse(Invoice invoice);
+
   @Mapping(target = "id", source = "customerId")
   @Mapping(target = "name", source = "customerName")
   @Mapping(target = "document", source = "customerDocument.value")
@@ -51,6 +53,8 @@ interface InvoiceRestMapper {
   }
 
   default List<Action> toActions(InvoiceStatus status) {
-    return status == InvoiceStatus.OPEN ? List.of(Action.EDIT_ITEMS, Action.CANCEL) : List.of();
+    return status == InvoiceStatus.OPEN
+        ? List.of(Action.EDIT_ITEMS, Action.CANCEL, Action.PRINT)
+        : List.of();
   }
 }
