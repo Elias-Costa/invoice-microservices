@@ -9,6 +9,7 @@ import {
   InvoiceResponse,
   InvoiceStatus,
   InvoiceSummaryResponse,
+  PrintInvoiceResponse,
   ReplaceInvoiceItemsRequest,
 } from '../../../shared/models/billing';
 
@@ -55,6 +56,12 @@ export class InvoiceApi {
 
   cancel(id: string, request: CancelInvoiceRequest) {
     return this.http.post<InvoiceResponse>(`${this.invoiceUrl(id)}/cancel`, request);
+  }
+
+  print(id: string) {
+    return this.http.post<PrintInvoiceResponse>(`${this.invoiceUrl(id)}/print`, null, {
+      context: new HttpContext().set(IDEMPOTENT_POST, true),
+    });
   }
 
   private invoiceUrl(id: string): string {

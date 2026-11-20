@@ -17,20 +17,40 @@
   }
   @case ('ready') {
     @let invoice = result.data;
+    @let feedback = printFeedback();
     <header class="page-header">
       <div class="invoice-heading">
         <h1 class="page-heading">Nota fiscal {{ invoice.number | invoiceNumber }}</h1>
         <app-invoice-status-chip [status]="invoice.status" />
       </div>
       <div class="actions">
-        @if (invoice.allowedActions.includes('EDIT_ITEMS')) {
-          <a mat-flat-button routerLink="edit">Editar itens</a>
+        @if (invoice.status === 'OPEN' && invoice.allowedActions.includes('PRINT')) {
+          <button
+            mat-flat-button
+            type="button"
+            [disabled]="feedback === 'starting'"
+            (click)="print(invoice)"
+          >
+            <span aria-hidden="true">🖨︎</span> Imprimir
+          </button>
         }
-        @if (invoice.allowedActions.includes('CANCEL')) {
+        @if (feedback !== 'starting' && invoice.allowedActions.includes('EDIT_ITEMS')) {
+          <a mat-stroked-button routerLink="edit">Editar itens</a>
+        }
+        @if (feedback !== 'starting' && invoice.allowedActions.includes('CANCEL')) {
           <button mat-stroked-button type="button" (click)="cancel(invoice)">Cancelar nota</button>
+        }
+        @if (invoice.status === 'PROCESSING' && !feedback) {
+          <button mat-button type="button" (click)="reload()">Recarregar</button>
         }
       </div>
     </header>
+
+    @if (feedback && feedback !== 'starting') {
+      <app-invoice-print-feedback [status]="feedback" (reload)="reload()" />
+    } @else if (invoice.status === 'OPEN' && invoice.lastFailureReason; as reason) {
+      <app-invoice-print-feedback status="rejected" [reason]="reason" />
+    }
 
     <mat-card appearance="outlined" class="workspace-card summary">
       <dl>
@@ -56,12 +76,6 @@
           <div>
             <dt>Cancelamento</dt>
             <dd>{{ invoice.canceledAt | date: 'dd/MM/yyyy HH:mm' }}</dd>
-          </div>
-        }
-        @if (invoice.lastFailureReason) {
-          <div class="reason">
-            <dt>Motivo da última falha</dt>
-            <dd>{{ invoice.lastFailureReason }}</dd>
           </div>
         }
         @if (invoice.cancelReason) {

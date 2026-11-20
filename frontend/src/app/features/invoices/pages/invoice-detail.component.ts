@@ -14,13 +14,15 @@ import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
-import { switchMap } from 'rxjs';
+import { filter, switchMap, takeUntil, tap } from 'rxjs';
 import { readState } from '../../../shared/http/read-state';
 import { InvoiceResponse } from '../../../shared/models/billing';
 import { CpfCnpjPipe } from '../../../shared/pipes/cpf-cnpj.pipe';
 import { CancelInvoiceDialogComponent } from '../components/cancel-invoice-dialog.component';
 import { InvoiceNumberPipe } from '../components/invoice-number.pipe';
+import { InvoicePrintFeedbackComponent } from '../components/invoice-print-feedback.component';
 import { InvoiceStatusChipComponent } from '../components/invoice-status-chip.component';
+import { InvoicePrinting, PrintFeedback } from '../data-access/invoice-printing';
 import { InvoiceApi } from '../data-access/invoice.api';
 
 @Component({
@@ -29,6 +31,7 @@ import { InvoiceApi } from '../data-access/invoice.api';
     CurrencyPipe,
     DatePipe,
     InvoiceNumberPipe,
+    InvoicePrintFeedbackComponent,
     InvoiceStatusChipComponent,
     MatButtonModule,
     MatCardModule,
@@ -43,13 +46,20 @@ export class InvoiceDetailComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly dialog = inject(MatDialog);
   private readonly snackbar = inject(MatSnackBar);
+  private readonly printing = inject(InvoicePrinting);
   private readonly refresh = signal(0);
-  private readonly canceledInvoice = signal<InvoiceResponse | null>(null);
+  private readonly updatedInvoice = signal<InvoiceResponse | null>(null);
 
   readonly id = input.required<string>();
+  private readonly ids = toObservable(this.id);
+  protected readonly printFeedback = signal<PrintFeedback | 'starting' | null>(null);
   private readonly query = computed(() => ({ id: this.id(), refresh: this.refresh() }));
   private readonly loaded = toSignal(
     toObservable(this.query).pipe(
+      tap(() => {
+        this.updatedInvoice.set(null);
+        this.printFeedback.set(null);
+      }),
       switchMap(({ id }) =>
         readState(this.api.get(id), 'Não foi possível carregar a nota fiscal.'),
       ),
@@ -57,14 +67,47 @@ export class InvoiceDetailComponent {
     { initialValue: { status: 'loading' } as const },
   );
   protected readonly state = computed(() => {
-    const canceled = this.canceledInvoice();
-    return canceled?.id === this.id()
-      ? ({ status: 'ready', data: canceled } as const)
+    const updated = this.updatedInvoice();
+    return updated?.id === this.id()
+      ? ({ status: 'ready', data: updated } as const)
       : this.loaded();
   });
 
   protected reload(): void {
     this.refresh.update((count) => count + 1);
+  }
+
+  protected print(invoice: InvoiceResponse): void {
+    if (
+      this.printFeedback() ||
+      invoice.status !== 'OPEN' ||
+      !invoice.allowedActions.includes('PRINT')
+    ) {
+      return;
+    }
+
+    this.printFeedback.set('starting');
+    this.printing
+      .start(invoice.id)
+      .pipe(
+        takeUntil(this.ids.pipe(filter((id) => id !== invoice.id))),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (update) => {
+          if (update.status === 'finished') {
+            this.updatedInvoice.set(update.invoice);
+            this.printFeedback.set(null);
+            return;
+          }
+
+          if (update.status === 'processing') {
+            this.updatedInvoice.set({ ...invoice, status: 'PROCESSING', allowedActions: [] });
+          }
+          this.printFeedback.set(update.status);
+        },
+        error: () => this.printFeedback.set(null),
+      });
   }
 
   protected cancel(invoice: InvoiceResponse): void {
@@ -77,7 +120,7 @@ export class InvoiceDetailComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((canceled) => {
         if (canceled) {
-          this.canceledInvoice.set(canceled);
+          this.updatedInvoice.set(canceled);
           this.snackbar.open('Nota fiscal cancelada.', 'Fechar', { duration: 3000 });
         }
       });

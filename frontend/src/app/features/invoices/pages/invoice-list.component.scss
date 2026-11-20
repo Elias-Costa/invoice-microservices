@@ -1,9 +1,14 @@
 .page-header,
-.filters {
+.filters,
+.print-notice-heading {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
+}
+
+app-invoice-print-feedback {
+  margin-block-end: 1rem;
 }
 
 .page-header {
@@ -41,7 +46,7 @@ mat-paginator {
 
 table {
   inline-size: 100%;
-  min-inline-size: 42rem;
+  min-inline-size: 49rem;
 }
 
 .invoice-link {

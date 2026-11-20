@@ -10,7 +10,15 @@ import { MatSelectHarness } from '@angular/material/select/testing';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from '../../../app.routes';
-import { customer, customersPath, invoicesPath, page, summary } from '../invoice-test-data';
+import {
+  customer,
+  customersPath,
+  invoice,
+  invoicePath,
+  invoicesPath,
+  page,
+  summary,
+} from '../invoice-test-data';
 
 describe('InvoiceListComponent and InvoiceStore', () => {
   let http: HttpTestingController;
@@ -60,6 +68,9 @@ describe('InvoiceListComponent and InvoiceStore', () => {
     expect(
       routing.routeNativeElement?.querySelector('mat-chip[data-status="PROCESSING"] mat-spinner'),
     ).not.toBeNull();
+    expect(await loader.getAllHarnesses(MatButtonHarness.with({ text: 'Imprimir' }))).toHaveLength(
+      1,
+    );
 
     const paginator = await loader.getHarness(MatPaginatorHarness);
     await paginator.goToNextPage();
@@ -120,5 +131,32 @@ describe('InvoiceListComponent and InvoiceStore', () => {
     const cleared = listRequest();
     expect(cleared.request.params.has('to')).toBe(false);
     cleared.flush(page([]));
+  });
+
+  it('starts printing from a row and cancels its poll when the user opens the detail', async () => {
+    const routing = await RouterTestingHarness.create('/invoices');
+    const loader = TestbedHarnessEnvironment.loader(routing.fixture);
+    listRequest().flush(page([summary]));
+    const print = await loader.getHarness(MatButtonHarness.with({ text: 'Imprimir' }));
+    await print.click();
+    expect(await print.isDisabled()).toBe(true);
+    http
+      .expectOne({ url: `${invoicePath}/print`, method: 'POST' })
+      .flush({ id: invoice.id, status: 'PROCESSING' }, { status: 202, statusText: 'Accepted' });
+    await routing.fixture.whenStable();
+    listRequest().flush(page([{ ...summary, status: 'PROCESSING' }]));
+    const poll = await vi.waitFor(() => http.expectOne(invoicePath));
+    expect(
+      routing.routeNativeElement?.querySelector('app-invoice-print-feedback mat-progress-bar'),
+    ).not.toBeNull();
+
+    await routing.navigateByUrl(`/invoices/${invoice.id}`);
+    expect(poll.cancelled).toBe(true);
+    http.expectOne(invoicePath).flush({ ...invoice, status: 'PROCESSING', allowedActions: [] });
+    await routing.fixture.whenStable();
+    expect(
+      routing.routeNativeElement?.querySelector('mat-chip[data-status="PROCESSING"]'),
+    ).not.toBeNull();
+    expect(await loader.hasHarness(MatButtonHarness.with({ text: /Imprimir/ }))).toBe(false);
   });
 });

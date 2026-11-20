@@ -35,7 +35,7 @@ describe('InvoiceDetailComponent and cancellation', () => {
     expect(routing.routeNativeElement?.textContent).toContain('529.982.247-25');
     expect(routing.routeNativeElement?.textContent).toMatch(/0[.,]60/);
     expect(routing.routeNativeElement?.textContent).toContain('Editar itens');
-    expect(routing.routeNativeElement?.textContent).not.toContain('Imprimir');
+    expect(routing.routeNativeElement?.textContent).toContain('Imprimir');
 
     await cancel.click();
     const overlay = TestbedHarnessEnvironment.documentRootLoader(routing.fixture);
@@ -67,6 +67,7 @@ describe('InvoiceDetailComponent and cancellation', () => {
     expect(routing.routeNativeElement?.textContent).toContain('Cancelamento');
     expect(routing.routeNativeElement?.textContent).toContain('Cancelada');
     expect(routing.routeNativeElement?.textContent).not.toContain('Editar itens');
+    expect(routing.routeNativeElement?.textContent).not.toContain('Imprimir');
     expect(await loader.hasHarness(MatButtonHarness.with({ text: 'Cancelar nota' }))).toBe(false);
   });
 
@@ -82,5 +83,56 @@ describe('InvoiceDetailComponent and cancellation', () => {
     expect(routing.routeNativeElement?.querySelector('[role="alert"]')?.textContent).toContain(
       'Nota fiscal não encontrada.',
     );
+  });
+
+  it('shows progress, then the stock rejection and the actions for an open invoice', async () => {
+    const routing = await RouterTestingHarness.create(`/invoices/${invoice.id}`);
+    http.expectOne(invoicePath).flush(invoice);
+    const loader = TestbedHarnessEnvironment.loader(routing.fixture);
+    const print = await loader.getHarness(MatButtonHarness.with({ text: /Imprimir/ }));
+    await print.click();
+    const post = http.expectOne({ url: `${invoicePath}/print`, method: 'POST' });
+    expect(await print.isDisabled()).toBe(true);
+    post.flush({ id: invoice.id, status: 'PROCESSING' }, { status: 202, statusText: 'Accepted' });
+    const poll = await vi.waitFor(() => http.expectOne(invoicePath));
+    await routing.fixture.whenStable();
+    expect(
+      routing.routeNativeElement?.querySelector('mat-chip[data-status="PROCESSING"]'),
+    ).not.toBeNull();
+    expect(
+      routing.routeNativeElement?.querySelector('app-invoice-print-feedback mat-progress-bar'),
+    ).not.toBeNull();
+    expect(await loader.hasHarness(MatButtonHarness.with({ text: /Imprimir/ }))).toBe(false);
+
+    const reason = 'Saldo insuficiente para PAR-M6 (solicitado 3, disponível 2).';
+    poll.flush({ ...invoice, lastFailureReason: reason });
+    await routing.fixture.whenStable();
+    expect(routing.routeNativeElement?.querySelector('[role="alert"]')?.textContent).toContain(
+      reason,
+    );
+    expect(routing.routeNativeElement?.textContent).toContain('Editar itens');
+    expect(
+      await (await loader.getHarness(MatButtonHarness.with({ text: /Imprimir/ }))).isDisabled(),
+    ).toBe(false);
+  });
+
+  it('cancels polling when navigating to another invoice in the reused detail route', async () => {
+    const routing = await RouterTestingHarness.create(`/invoices/${invoice.id}`);
+    http.expectOne(invoicePath).flush(invoice);
+    const loader = TestbedHarnessEnvironment.loader(routing.fixture);
+    await (await loader.getHarness(MatButtonHarness.with({ text: /Imprimir/ }))).click();
+    http
+      .expectOne({ url: `${invoicePath}/print`, method: 'POST' })
+      .flush({ id: invoice.id, status: 'PROCESSING' }, { status: 202, statusText: 'Accepted' });
+    const poll = await vi.waitFor(() => http.expectOne(invoicePath));
+
+    await routing.navigateByUrl('/invoices/invoice-2');
+    expect(poll.cancelled).toBe(true);
+    http
+      .expectOne('/api/billing/invoices/invoice-2')
+      .flush({ ...invoice, id: 'invoice-2', number: 13 });
+    await routing.fixture.whenStable();
+    expect(routing.routeNativeElement?.textContent).toContain('Nota fiscal 000013');
+    expect(routing.routeNativeElement?.querySelector('app-invoice-print-feedback')).toBeNull();
   });
 });
