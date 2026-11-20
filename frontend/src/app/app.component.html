@@ -16,6 +16,16 @@
   <span class="brand-name">Notas Fiscais</span>
 </mat-toolbar>
 
+@if (apiActivity.loading()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Carregando dados" />
+}
+
+<div class="connection-status" role="status">
+  @if (apiActivity.disconnected()) {
+    <p>Sem conexão com o servidor</p>
+  }
+</div>
+
 <mat-sidenav-container class="workspace">
   <mat-sidenav
     #drawer

@@ -95,6 +95,9 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-057](#d-057--sequência-de-notas-no-seed-do-faturamento) | 2026-11-20 | Sequência de notas no seed do Faturamento | aceita | — |
 | [D-058](#d-058--dependências-e-execução-local-do-gateway) | 2026-11-20 | Dependências e execução local do Gateway | aceita | — |
 | [D-059](#d-059--correlação-http-e-cors-no-gateway) | 2026-11-20 | Correlação HTTP e CORS no Gateway | aceita | — |
+| [D-060](#d-060--origem-da-api-e-imagens-do-frontend) | 2026-11-20 | Origem da API e imagens do frontend | aceita | — |
+| [D-061](#d-061--feedback-e-repetição-de-requisições-no-frontend) | 2026-11-20 | Feedback e repetição de requisições no frontend | aceita | — |
+| [D-062](#d-062--rotas-lazy-antes-das-telas-de-domínio) | 2026-11-20 | Rotas lazy antes das telas de domínio | aceita | — |
 
 ---
 
@@ -932,5 +935,47 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: os serviços usam o identificador do Gateway na resposta de erro. O frontend pode enviar a chave de idempotência, ler o endereço retornado pelas escritas e apresentar o identificador de erro.
 - **Y-statement**: no contexto do acesso do frontend à API durante a F1, decidimos gerar a correlação no Gateway e restringir CORS à origem e aos recursos usados pelo navegador para manter um identificador único por requisição e permitir as operações previstas.
 - **Documentos afetados**: plano local de implementação (F1-22), com detalhamento de RNF-SEC-05 e RNF-OBS-05.
+- **ADR**: —
+- **Substitui**: —
+
+### D-060 — Origem da API e imagens do frontend
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-24 prevê a configuração da API e o Nginx de produção local. O plano não fixa a origem da API durante o desenvolvimento nem as imagens base.
+- **Opções consideradas**: encaminhar `/api` pela mesma origem em ambos os ambientes ou acessar o Gateway diretamente durante o desenvolvimento.
+- **Decisão**: usar caminhos de API na mesma origem. O `ng serve` encaminha `/api` para `127.0.0.1:8080`, e o Nginx encaminha para `api-gateway:8080`. Usar `node:22-alpine` para o build e `nginx:stable-alpine` no runtime, com Nginx executando como usuário não-root na porta interna 80.
+- **Consequências**: o client Angular usa os mesmos caminhos nos dois ambientes. Cada proxy preserva o prefixo da API e depende do Gateway no endereço correspondente.
+- **Y-statement**: no contexto da integração com o Gateway, decidimos usar a mesma origem nos dois ambientes para compartilhar os caminhos da API, aceitando configurar um proxy em cada servidor.
+- **Documentos afetados**: plano local de implementação (F1-24).
+- **ADR**: —
+- **Substitui**: —
+
+### D-061 — Feedback e repetição de requisições no frontend
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-RES-01 define as ações para erros HTTP. A F1 não inclui login, e o requisito não delimita quais escritas podem ser repetidas após um 503.
+- **Opções consideradas**: permitir repetir qualquer requisição após um 503 ou limitar a ação a leituras, POSTs idempotentes e escritas autorizadas pela tela.
+- **Decisão**: na F1, apresentar snackbar em caso de 401. Em 409, a ação “Recarregar” recarrega a página. Em 503, a ação “Tentar novamente” repete leituras e POSTs marcados, preservando a chave de idempotência. Outras escritas só são repetidas mediante autorização explícita da tela.
+- **Consequências**: o login permanece na F2. A ação de recarregar aplica a navegação normal do navegador. Uma tela que permita repetir outra escrita precisa declarar essa escolha na requisição.
+- **Y-statement**: no contexto do feedback do MVP, decidimos exigir ação explícita para repetir operações após um 503 e limitar as escritas elegíveis para reduzir o risco de duplicação.
+- **Documentos afetados**: plano local de implementação (F1-24), com detalhamento de RF-RES-01.
+- **ADR**: —
+- **Substitui**: —
+
+### D-062 — Rotas lazy antes das telas de domínio
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-24 prepara as rotas de produtos, clientes e notas, cujas telas serão entregues nas tarefas seguintes.
+- **Opções consideradas**: manter os itens de navegação desabilitados ou ativá-los com páginas provisórias.
+- **Decisão**: declarar as três rotas lazy com página simples de indisponibilidade temporária. Manter os itens do menu desabilitados até a entrega das respectivas telas.
+- **Consequências**: é possível verificar a navegação direta e o carregamento por rota enquanto o menu indica as telas disponíveis.
+- **Y-statement**: no contexto da entrega incremental do frontend, decidimos preparar as rotas e habilitar a navegação do menu quando cada tela for entregue.
+- **Documentos afetados**: plano local de implementação (F1-24 a F1-27).
 - **ADR**: —
 - **Substitui**: —

@@ -1,0 +1,17 @@
+*
+!frontend/
+frontend/*
+!frontend/angular.json
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/proxy.conf.json
+!frontend/tsconfig*.json
+!frontend/src/
+!frontend/src/**
+!frontend/public/
+!frontend/public/**
+!infra/
+infra/*
+!infra/nginx/
+infra/nginx/*
+!infra/nginx/default.conf

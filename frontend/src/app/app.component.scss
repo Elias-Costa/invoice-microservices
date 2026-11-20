@@ -56,6 +56,13 @@
     0 5px currentColor;
 }
 
+.connection-status p {
+  margin: 0;
+  padding: 0.75rem clamp(1rem, 3vw, 2rem);
+  background: #ffebd2;
+  color: #642e12;
+}
+
 .workspace {
   display: flex;
   flex: 1;
