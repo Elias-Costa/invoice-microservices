@@ -69,12 +69,21 @@
         <span matListItemTitle>Clientes</span>
       </a>
 
-      @for (section of upcomingSections; track section.label) {
-        <a mat-list-item disabled role="link">
-          <span matListItemIcon [class]="'nav-icon ' + section.icon" aria-hidden="true"></span>
-          <span matListItemTitle>{{ section.label }}</span>
-        </a>
-      }
+      <a
+        mat-list-item
+        routerLink="/invoices"
+        routerLinkActive="active-link"
+        ariaCurrentWhenActive="page"
+        (click)="compact() && drawer.close()"
+      >
+        <span matListItemIcon class="nav-icon invoices" aria-hidden="true"></span>
+        <span matListItemTitle>Notas fiscais</span>
+      </a>
+
+      <a mat-list-item disabled role="link">
+        <span matListItemIcon class="nav-icon status" aria-hidden="true"></span>
+        <span matListItemTitle>Status do sistema</span>
+      </a>
     </mat-nav-list>
   </mat-sidenav>
 

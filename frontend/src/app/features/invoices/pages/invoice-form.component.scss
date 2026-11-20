@@ -1,0 +1,124 @@
+.back-link {
+  display: inline-block;
+  margin-block-end: 1rem;
+  color: var(--mat-sys-primary);
+  text-underline-offset: 0.2em;
+}
+
+fieldset {
+  display: grid;
+  gap: 1.25rem;
+  min-inline-size: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.form-card,
+.item-header,
+.total {
+  padding: 1rem 1.25rem;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  margin: 1rem 0 0;
+}
+
+dt,
+.description {
+  display: block;
+  color: var(--invoice-muted);
+  font-size: 0.875rem;
+}
+
+dd {
+  margin: 0.25rem 0 0;
+}
+
+app-invoice-customer-picker,
+app-invoice-product-picker {
+  max-inline-size: 30rem;
+}
+
+.item-header {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.table-scroll {
+  overflow: auto;
+  border-block: 1px solid var(--invoice-border);
+}
+
+table {
+  border-collapse: collapse;
+  inline-size: 100%;
+  min-inline-size: 46rem;
+}
+
+th,
+td {
+  padding: 0.75rem 1rem;
+  text-align: start;
+}
+
+tbody tr {
+  border-block-start: 1px solid var(--invoice-border);
+}
+
+.quantity {
+  inline-size: 12rem;
+}
+
+.quantity mat-form-field {
+  inline-size: 100%;
+}
+
+.amount {
+  text-align: end;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.balance-warning {
+  margin: 0.35rem 0 0;
+  color: #6e4904;
+  font-size: 0.875rem;
+}
+
+.field-error,
+.form-error {
+  color: var(--mat-sys-error);
+}
+
+.form-error {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.6rem;
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
+
+.total,
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.total {
+  justify-content: space-between;
+}
+
+.actions {
+  justify-content: flex-end;
+}

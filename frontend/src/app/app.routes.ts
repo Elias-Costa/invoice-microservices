@@ -19,10 +19,8 @@ export const routes: Routes = [
   },
   {
     path: 'invoices',
-    title: 'Notas fiscais | Notas Fiscais',
-    data: { heading: 'Notas fiscais' },
-    loadComponent: () =>
-      import('./shared/unavailable-page.component').then((page) => page.UnavailablePageComponent),
+    loadChildren: () =>
+      import('./features/invoices/invoice.routes').then((feature) => feature.invoiceRoutes),
   },
   {
     path: 'forbidden',

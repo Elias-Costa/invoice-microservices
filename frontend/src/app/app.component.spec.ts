@@ -38,7 +38,10 @@ describe('AppComponent', () => {
     );
     expect(navigation?.querySelector('a[href="/products"]')?.textContent).toContain('Produtos');
     expect(navigation?.querySelector('a[href="/customers"]')?.textContent).toContain('Clientes');
-    expect(navigation?.querySelectorAll('[aria-disabled="true"]')).toHaveLength(2);
+    expect(navigation?.querySelector('a[href="/invoices"]')?.textContent).toContain(
+      'Notas fiscais',
+    );
+    expect(navigation?.querySelectorAll('[aria-disabled="true"]')).toHaveLength(1);
   });
 
   it('opens the forbidden page and returns home through its link', async () => {
@@ -59,7 +62,7 @@ describe('AppComponent', () => {
     expect(shell.querySelector('h1')?.textContent).toBe('Visão geral');
   });
 
-  it('opens the provisional invoices page by URL', async () => {
+  it('opens the invoices list by URL', async () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.autoDetectChanges();
     await TestBed.inject(Router).navigateByUrl('/invoices');
@@ -67,10 +70,19 @@ describe('AppComponent', () => {
 
     const shell: HTMLElement = fixture.nativeElement;
     expect(shell.querySelector('h1')?.textContent).toBe('Notas fiscais');
+    expect(shell.querySelector('a[aria-current="page"]')?.getAttribute('href')).toBe('/invoices');
+    const requests = TestBed.inject(HttpTestingController);
+    requests
+      .expectOne((request) => request.url === '/api/billing/invoices')
+      .flush({
+        content: [],
+        page: { number: 0, size: 20, totalElements: 0, totalPages: 0 },
+      });
+    await fixture.whenStable();
     expect(shell.querySelector('[role="main"]')?.textContent).toContain(
-      'Esta seção ainda está indisponível.',
+      'Nenhuma nota fiscal encontrada.',
     );
-    expect(shell.querySelectorAll('[aria-disabled="true"]')).toHaveLength(2);
+    requests.verify();
   });
 
   it('announces a network failure and hides it after the API responds', async () => {

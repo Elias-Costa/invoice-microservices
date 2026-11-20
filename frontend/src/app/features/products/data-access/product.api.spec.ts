@@ -26,6 +26,23 @@ describe('ProductApi', () => {
 
   afterEach(() => http.verify());
 
+  it('loads current stock data in distinct batches of at most 100 IDs', () => {
+    const ids = Array.from({ length: 101 }, (_, index) => `item-${index}`);
+    const firstProduct = { ...product, id: ids[0] };
+    const lastProduct = { ...product, id: ids[100], active: false };
+    const onProducts = vi.fn();
+    api.getBatch([...ids, ids[0]]).subscribe(onProducts);
+    const batchUrl = `${productsPath}/batch`;
+    const requests = http.match((request) => request.url === batchUrl);
+    expect(requests).toHaveLength(2);
+    expect(requests[0].request.params.get('ids')?.split(',')).toEqual(ids.slice(0, 100));
+    expect(requests[1].request.params.get('ids')).toBe(ids[100]);
+    requests[1].flush([lastProduct]);
+    expect(onProducts).not.toHaveBeenCalled();
+    requests[0].flush([firstProduct]);
+    expect(onProducts).toHaveBeenCalledWith([firstProduct, lastProduct]);
+  });
+
   it('marks only product creation and manual movements as idempotent POSTs', () => {
     const create = {
       code: product.code,

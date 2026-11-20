@@ -1,10 +1,11 @@
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { map } from 'rxjs';
+import { forkJoin, map, Observable, of } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { IDEMPOTENT_POST } from '../../../core/interceptors/idempotency.interceptor';
 import { ApiPage } from '../../../shared/models/api-page';
 import {
+  BatchProductResponse,
   CreateProductRequest,
   ProductResponse,
   RegisterStockMovementRequest,
@@ -44,6 +45,20 @@ export class ProductApi {
 
   get(id: string) {
     return this.http.get<ProductResponse>(this.productUrl(id));
+  }
+
+  getBatch(ids: readonly string[]) {
+    const batchSize = 100;
+    const uniqueIds = [...new Set(ids)];
+    const batches: Observable<BatchProductResponse[]>[] = [];
+    for (let offset = 0; offset < uniqueIds.length; offset += batchSize) {
+      batches.push(
+        this.http.get<BatchProductResponse[]>(`${this.baseUrl}/batch`, {
+          params: { ids: uniqueIds.slice(offset, offset + batchSize).join(',') },
+        }),
+      );
+    }
+    return batches.length ? forkJoin(batches).pipe(map((results) => results.flat())) : of([]);
   }
 
   create(request: CreateProductRequest, key: string) {

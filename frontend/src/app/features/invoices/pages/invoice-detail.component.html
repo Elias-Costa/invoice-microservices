@@ -1,0 +1,109 @@
+<a class="back-link" routerLink="/invoices">← Notas fiscais</a>
+
+@let result = state();
+@switch (result.status) {
+  @case ('loading') {
+    <h1 class="page-heading">Detalhe da nota fiscal</h1>
+    <mat-card appearance="outlined" class="workspace-card message"
+      ><p role="status">Carregando nota fiscal…</p></mat-card
+    >
+  }
+  @case ('failed') {
+    <h1 class="page-heading">Detalhe da nota fiscal</h1>
+    <mat-card appearance="outlined" class="workspace-card message">
+      <p role="alert">{{ result.message }}</p>
+      <button mat-button type="button" (click)="reload()">Tentar novamente</button>
+    </mat-card>
+  }
+  @case ('ready') {
+    @let invoice = result.data;
+    <header class="page-header">
+      <div class="invoice-heading">
+        <h1 class="page-heading">Nota fiscal {{ invoice.number | invoiceNumber }}</h1>
+        <app-invoice-status-chip [status]="invoice.status" />
+      </div>
+      <div class="actions">
+        @if (invoice.allowedActions.includes('EDIT_ITEMS')) {
+          <a mat-flat-button routerLink="edit">Editar itens</a>
+        }
+        @if (invoice.allowedActions.includes('CANCEL')) {
+          <button mat-stroked-button type="button" (click)="cancel(invoice)">Cancelar nota</button>
+        }
+      </div>
+    </header>
+
+    <mat-card appearance="outlined" class="workspace-card summary">
+      <dl>
+        <div>
+          <dt>Cliente</dt>
+          <dd>{{ invoice.customer.name }}</dd>
+        </div>
+        <div>
+          <dt>CPF ou CNPJ</dt>
+          <dd>{{ invoice.customer.document | cpfCnpj }}</dd>
+        </div>
+        <div>
+          <dt>Criação</dt>
+          <dd>{{ invoice.createdAt | date: 'dd/MM/yyyy HH:mm' }}</dd>
+        </div>
+        @if (invoice.closedAt) {
+          <div>
+            <dt>Fechamento</dt>
+            <dd>{{ invoice.closedAt | date: 'dd/MM/yyyy HH:mm' }}</dd>
+          </div>
+        }
+        @if (invoice.canceledAt) {
+          <div>
+            <dt>Cancelamento</dt>
+            <dd>{{ invoice.canceledAt | date: 'dd/MM/yyyy HH:mm' }}</dd>
+          </div>
+        }
+        @if (invoice.lastFailureReason) {
+          <div class="reason">
+            <dt>Motivo da última falha</dt>
+            <dd>{{ invoice.lastFailureReason }}</dd>
+          </div>
+        }
+        @if (invoice.cancelReason) {
+          <div class="reason">
+            <dt>Motivo do cancelamento</dt>
+            <dd>{{ invoice.cancelReason }}</dd>
+          </div>
+        }
+      </dl>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="workspace-card">
+      <h2>Itens da nota</h2>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Itens da nota fiscal">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Produto</th>
+              <th scope="col" class="amount">Quantidade</th>
+              <th scope="col" class="amount">Preço unitário</th>
+              <th scope="col" class="amount">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of invoice.items; track item.id) {
+              <tr>
+                <td>
+                  <strong>{{ item.productCode }}</strong><span class="description">{{
+                    item.productDescription
+                  }}</span>
+                </td>
+                <td class="amount">{{ item.quantity }}</td>
+                <td class="amount">{{ item.unitPrice | currency: 'BRL' }}</td>
+                <td class="amount">{{ item.lineTotal | currency: 'BRL' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="total">
+        <span>Total da nota</span><strong>{{ invoice.total | currency: 'BRL' }}</strong>
+      </p>
+    </mat-card>
+  }
+}

@@ -34,9 +34,4 @@ export class AppComponent {
     this.breakpoints.observe('(max-width: 820px)').pipe(map(({ matches }) => matches)),
     { requireSync: true },
   );
-
-  protected readonly upcomingSections = [
-    { label: 'Notas fiscais', icon: 'invoices' },
-    { label: 'Status do sistema', icon: 'status' },
-  ];
 }

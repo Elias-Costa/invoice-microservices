@@ -1,0 +1,180 @@
+<a class="back-link" [routerLink]="id() ? ['/invoices', id()] : ['/invoices']">
+  {{ id() ? '← Voltar à nota' : '← Notas fiscais' }}
+</a>
+<h1 class="page-heading">{{ id() ? 'Editar itens da nota' : 'Nova nota fiscal' }}</h1>
+
+@let result = state();
+@switch (result.status) {
+  @case ('loading') {
+    <mat-card appearance="outlined" class="workspace-card form-card"
+      ><p role="status">Carregando formulário…</p></mat-card
+    >
+  }
+  @case ('failed') {
+    <mat-card appearance="outlined" class="workspace-card form-card">
+      <p role="alert">{{ result.message }}</p>
+      <button mat-button type="button" (click)="retryLoad()">Tentar novamente</button>
+    </mat-card>
+  }
+  @case ('ready') {
+    @let invoice = result.data;
+    @if (invoice && !invoice.allowedActions.includes('EDIT_ITEMS')) {
+      <mat-card appearance="outlined" class="workspace-card form-card">
+        <p role="status">
+          A edição de itens está indisponível para a nota {{ invoice.number | invoiceNumber }}.
+        </p>
+      </mat-card>
+    } @else {
+      @let preview = amounts();
+      <form [formGroup]="form" (ngSubmit)="save()">
+        <fieldset [disabled]="saving()">
+          <mat-card appearance="outlined" class="workspace-card form-card">
+            @if (invoice) {
+              <h2>Nota fiscal {{ invoice.number | invoiceNumber }}</h2>
+              <dl>
+                <div>
+                  <dt>Cliente</dt>
+                  <dd>{{ invoice.customer.name }}</dd>
+                </div>
+                <div>
+                  <dt>CPF ou CNPJ</dt>
+                  <dd>{{ invoice.customer.document | cpfCnpj }}</dd>
+                </div>
+              </dl>
+            } @else {
+              <app-invoice-customer-picker
+                [required]="true"
+                (selectionChanged)="selectCustomer($event)"
+              />
+              @if (form.controls.customerId.hasError('server')) {
+                <p class="field-error" role="alert">
+                  {{ fieldMessage(form.controls.customerId, 'Selecione um cliente.') }}
+                </p>
+              }
+            }
+          </mat-card>
+
+          <mat-card appearance="outlined" class="workspace-card item-card">
+            <div class="item-header">
+              <h2>Itens da nota</h2>
+              <app-invoice-product-picker
+                [selectedIds]="selectedIds()"
+                (productSelected)="addProduct($event)"
+              />
+            </div>
+
+            <div class="table-scroll" role="region" aria-label="Itens da nota fiscal" tabindex="0">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Produto</th>
+                    <th scope="col" class="amount">Preço unitário</th>
+                    <th scope="col">Quantidade</th>
+                    <th scope="col" class="amount">Subtotal</th>
+                    <th scope="col"><span class="cdk-visually-hidden">Ações</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (line of preview.lines; track line.product.id; let index = $index) {
+                    @let quantityControl = items.at(index).controls.quantity;
+                    <tr>
+                      <td>
+                        <strong>{{ line.product.code }}</strong>
+                        <span class="description">{{ line.product.description }}</span>
+                        @if (line.product.balance !== null) {
+                          <span class="description">Saldo atual: {{ line.product.balance }}</span>
+                        }
+                        @if (!line.product.active) {
+                          <p class="field-error">
+                            Produto indisponível. Remova este item para salvar.
+                          </p>
+                        }
+                      </td>
+                      <td class="amount">{{ line.product.unitPrice | currency: 'BRL' }}</td>
+                      <td class="quantity">
+                        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                          <mat-label>Quantidade</mat-label>
+                          <input
+                            matInput
+                            type="number"
+                            step="1"
+                            [formControl]="quantityControl"
+                            required
+                            [attr.aria-label]="'Quantidade de ' + line.product.code"
+                          />
+                          <mat-error>{{
+                            fieldMessage(
+                              quantityControl,
+                              'Informe uma quantidade inteira entre 1 e 2.147.483.647.'
+                            )
+                          }}</mat-error>
+                        </mat-form-field>
+                        @if (
+                          line.product.active &&
+                          line.quantity !== null &&
+                          line.product.balance !== null &&
+                          line.quantity > line.product.balance
+                        ) {
+                          <p class="balance-warning" role="status">
+                            Quantidade acima do saldo atual.
+                          </p>
+                        }
+                      </td>
+                      <td class="amount">
+                        {{
+                          line.subtotal === null
+                            ? 'Limite excedido'
+                            : (line.subtotal | currency: 'BRL')
+                        }}
+                      </td>
+                      <td>
+                        <button
+                          mat-button
+                          type="button"
+                          [attr.aria-label]="'Remover ' + line.product.code"
+                          (click)="removeProduct(index)"
+                        >
+                          Remover
+                        </button>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="5" class="description">Adicione pelo menos um produto.</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <div class="total" aria-live="polite">
+              <span>Total da nota</span>
+              @if (preview.total === null) {
+                <strong class="field-error">O total ultrapassa o limite permitido.</strong>
+              } @else {
+                <strong>{{ preview.total | currency: 'BRL' }}</strong>
+              }
+            </div>
+          </mat-card>
+
+          @if (failure()) {
+            <p class="form-error" role="alert">{{ failure() }}</p>
+          }
+
+          <div class="actions">
+            <a mat-button [routerLink]="invoice ? ['/invoices', invoice.id] : ['/invoices']"
+              >Voltar</a
+            >
+            <button
+              mat-flat-button
+              type="submit"
+              [disabled]="form.invalid || saving() || preview.total === null || preview.hasInactive"
+            >
+              {{ saving() ? 'Salvando…' : invoice ? 'Salvar itens' : 'Criar nota fiscal' }}
+            </button>
+          </div>
+        </fieldset>
+      </form>
+    }
+  }
+}
