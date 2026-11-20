@@ -1,0 +1,60 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: stock-service
+              uri: ${invoice.stock.base-url}
+              predicates:
+                - Path=/api/stock/**
+            - id: billing-service
+              uri: ${invoice.billing.base-url}
+              predicates:
+                - Path=/api/billing/**
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - http://localhost:4200
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                allowedHeaders:
+                  - Content-Type
+                  - Idempotency-Key
+                exposedHeaders:
+                  - Location
+                  - X-Trace-Id
+                allowCredentials: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+invoice:
+  stock:
+    base-url: http://localhost:8081
+  billing:
+    base-url: http://localhost:8082
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+invoice:
+  stock:
+    base-url: http://stock-service:8081
+  billing:
+    base-url: http://billing-service:8082

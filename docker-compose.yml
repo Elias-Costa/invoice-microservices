@@ -1,12 +1,12 @@
 # Infra local do invoice-microservices — requisitos.md §8.2/§8.13, RNF-RUN-01, RNF-RES-06.
 #
-#   docker compose up --build -d            # bancos, Kafka, Estoque e Faturamento
+#   docker compose up --build -d            # bancos, Kafka, Estoque, Faturamento e Gateway
 #   docker compose --profile tools up -d    # + Kafka UI em http://localhost:8090
 #   docker compose down                     # NUNCA use -v sem confirmar: apaga os bancos
 #
 # Variáveis: .env.example lista todas; os defaults abaixo são os mesmos valores, então a stack
 # sobe sem `.env`. Portas de bancos e Kafka são publicadas apenas em 127.0.0.1 (D-018).
-# api-gateway e frontend entram nas tarefas seguintes.
+# O frontend entra nas tarefas seguintes.
 # Keycloak e observabilidade ficam previstos na Fase 2.
 
 name: invoice-microservices
@@ -143,6 +143,22 @@ services:
       POSTGRES_BILLING_USER: ${POSTGRES_BILLING_USER:-billing_user}
       POSTGRES_BILLING_PASSWORD: ${POSTGRES_BILLING_PASSWORD:-billing_pass}
 
+  api-gateway:
+    build:
+      context: ./backend
+      dockerfile: api-gateway/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      stock-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+    networks: [edge, internal]
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
   kafka-ui:
     image: ghcr.io/kafbat/kafka-ui:v1.5.0
     profiles: [tools]
@@ -163,7 +179,7 @@ services:
       start_period: 20s
 
 networks:
-  # `edge`: frontend, api-gateway e Keycloak (entram em F1-22, F1-29 e F2-01).
+  # `edge`: Gateway, frontend (F1-29) e Keycloak (F2-01).
   # `internal`: serviços de domínio, bancos e Kafka (§8.13).
   edge:
   internal:

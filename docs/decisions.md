@@ -93,6 +93,8 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-055](#d-055--resultado-de-baixa-para-nota-inexistente) | 2026-11-20 | Resultado de baixa para nota inexistente | aceita | — |
 | [D-056](#d-056--execução-local-do-faturamento-no-compose) | 2026-11-20 | Execução local do Faturamento no Compose | aceita | — |
 | [D-057](#d-057--sequência-de-notas-no-seed-do-faturamento) | 2026-11-20 | Sequência de notas no seed do Faturamento | aceita | — |
+| [D-058](#d-058--dependências-e-execução-local-do-gateway) | 2026-11-20 | Dependências e execução local do Gateway | aceita | — |
+| [D-059](#d-059--correlação-http-e-cors-no-gateway) | 2026-11-20 | Correlação HTTP e CORS no Gateway | aceita | — |
 
 ---
 
@@ -902,5 +904,33 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: a primeira nota de um banco recém-populado recebe o nº 6. Reexecutar o seed preserva o avanço da sequência. Um conflito com os números da demonstração precisa ser resolvido antes de ativar o perfil `demo` naquele banco.
 - **Y-statement**: no contexto de um seed repetível com números fixos, decidimos limitar o ajuste da sequência a avanços e rejeitar conflitos nos números 1–5 para preservar as notas do banco.
 - **Documentos afetados**: `modelo-de-dados.md` §13.5 e Apêndice A.4 · plano local de implementação (F1-21).
+- **ADR**: —
+- **Substitui**: —
+
+### D-058 — Dependências e execução local do Gateway
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a F1-22 prevê roteamento, Actuator, testes com `WebTestClient` e execução local na porta 8080. O `pom.xml` do módulo ainda é o esqueleto do bootstrap.
+- **Opções consideradas**: usar o Spring Cloud Gateway Server WebFlux com os BOMs existentes e servidores HTTP simulados pelo JDK, ou adicionar uma biblioteca de simulação para os testes de roteamento.
+- **Decisão**: adicionar `spring-cloud-starter-gateway-server-webflux`, `spring-boot-starter-actuator` e `spring-boot-starter-test`, nas versões gerenciadas pelos BOMs. Usar servidores HTTP do JDK nos testes. Autorizar `docker-compose.yml` com o Gateway publicado em `127.0.0.1:8080`, conectado a `edge` e `internal`, e iniciado quando Estoque e Faturamento estiverem saudáveis.
+- **Consequências**: o frontend pode usar a rede `edge` para chegar ao Gateway, e o Gateway encontra os serviços de domínio na rede `internal`. Os testes do módulo podem rodar com Java 21 sem Docker.
+- **Y-statement**: no contexto do MVP local, decidimos usar as dependências gerenciadas pela plataforma e executar o Gateway nas duas redes do Compose para conectar o ponto de entrada aos serviços de domínio.
+- **Documentos afetados**: plano local de implementação (F1-22) · `docker-compose.yml`.
+- **ADR**: —
+- **Substitui**: —
+
+### D-059 — Correlação HTTP e CORS no Gateway
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RNF-OBS-05 e D-010 exigem um identificador de correlação na resposta e no `ProblemDetail` dos serviços. RNF-SEC-05 exige que o Gateway restrinja CORS à origem do frontend.
+- **Opções consideradas**: gerar o identificador no Gateway ou reaproveitar um valor enviado pelo cliente. Para CORS, autorizar os métodos e cabeçalhos da API ou aceitar qualquer método e cabeçalho para a origem local.
+- **Decisão**: gerar um UUID por requisição no Gateway, substituir `X-Trace-Id` recebido e usar o mesmo valor no encaminhamento e na resposta. Aceitar CORS apenas de `http://localhost:4200`, para `GET`, `POST`, `PUT` e `DELETE`, com `Content-Type` e `Idempotency-Key`. Expor `Location` e `X-Trace-Id` ao navegador, sem credenciais.
+- **Consequências**: os serviços usam o identificador do Gateway na resposta de erro. O frontend pode enviar a chave de idempotência, ler o endereço retornado pelas escritas e apresentar o identificador de erro.
+- **Y-statement**: no contexto do acesso do frontend à API durante a F1, decidimos gerar a correlação no Gateway e restringir CORS à origem e aos recursos usados pelo navegador para manter um identificador único por requisição e permitir as operações previstas.
+- **Documentos afetados**: plano local de implementação (F1-22), com detalhamento de RNF-SEC-05 e RNF-OBS-05.
 - **ADR**: —
 - **Substitui**: —
