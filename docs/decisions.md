@@ -101,6 +101,7 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-063](#d-063--validação-do-código-no-cadastro-de-produtos) | 2026-11-20 | Validação do código no cadastro de produtos | aceita | — |
 | [D-064](#d-064--confirmação-de-saída-dos-formulários-de-produto) | 2026-11-20 | Confirmação de saída dos formulários de produto | aceita | — |
 | [D-065](#d-065--máscara-de-telefone-nos-dados-do-cliente) | 2026-11-20 | Máscara de telefone nos dados do cliente | aceita | — |
+| [D-066](#d-066--execução-local-do-frontend-no-compose) | 2026-11-20 | Execução local do frontend no Compose | aceita | — |
 
 ---
 
@@ -1022,5 +1023,19 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: o formulário aceita número de telefone formatado na interface e o detalhe usa a mesma apresentação. A API continua recebendo o telefone sem pontuação.
 - **Y-statement**: no contexto da interface de clientes, decidimos formatar os números brasileiros com DDI e DDD para facilitar a leitura e exibir os demais em formato internacional simples, preservando o armazenamento dos dígitos.
 - **Documentos afetados**: modelo de dados §5.2 (detalhamento registrado nesta decisão) · plano local de implementação (F1-26).
+- **ADR**: —
+- **Substitui**: —
+
+### D-066 — Execução local do frontend no Compose
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta do agente)
+- **Contexto**: a F1-29 integra ao Compose a imagem de produção do frontend preparada na F1-24. A aplicação serve a interface na porta 80 do contêiner e usa o proxy da D-060 para alcançar o Gateway.
+- **Opções consideradas**: publicar a porta 4200 apenas em loopback, seguindo o padrão dos serviços locais, ou publicá-la em todas as interfaces para permitir acesso de outros dispositivos.
+- **Decisão**: publicar `127.0.0.1:4200:80`, ligar o frontend à rede `edge` e iniciar o serviço quando o Gateway estiver saudável. Usar uma checagem HTTP da página servida pelo Nginx. Manter o proxy de `/api` na mesma origem (D-060) e a configuração de CORS do Gateway (D-059).
+- **Consequências**: o navegador na máquina de desenvolvimento acessa a aplicação em `http://localhost:4200`, e o Compose verifica que o contêiner entrega a página inicial.
+- **Y-statement**: no contexto da demonstração local da F1, decidimos publicar a interface em loopback e ordenar a subida pelo healthcheck do Gateway para disponibilizar a UI e a API com um único comando.
+- **Documentos afetados**: `docker-compose.yml` · plano local de implementação (F1-29).
 - **ADR**: —
 - **Substitui**: —
