@@ -14,10 +14,8 @@ export const routes: Routes = [
   },
   {
     path: 'customers',
-    title: 'Clientes | Notas Fiscais',
-    data: { heading: 'Clientes' },
-    loadComponent: () =>
-      import('./shared/unavailable-page.component').then((page) => page.UnavailablePageComponent),
+    loadChildren: () =>
+      import('./features/customers/customer.routes').then((feature) => feature.customerRoutes),
   },
   {
     path: 'invoices',

@@ -1,0 +1,121 @@
+<header class="page-header">
+  <h1 class="page-heading">Clientes</h1>
+  <a mat-flat-button routerLink="new">Novo cliente</a>
+</header>
+
+<mat-card appearance="outlined" class="workspace-card">
+  <div class="filters">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Buscar por nome, CPF ou CNPJ</mat-label>
+      <input matInput [formControl]="search" />
+    </mat-form-field>
+    <mat-slide-toggle [checked]="!store.query().active" (change)="store.setActive(!$event.checked)">
+      Exibir clientes inativos
+    </mat-slide-toggle>
+  </div>
+
+  @let result = store.result();
+  <div class="table-scroll" role="region" aria-label="Tabela de clientes" tabindex="0">
+    <table
+      mat-table
+      matSort
+      matSortDisableClear
+      aria-label="Clientes"
+      [attr.aria-busy]="result.status === 'loading'"
+      [dataSource]="page()?.content ?? []"
+      [trackBy]="customerId"
+      [matSortActive]="store.query().sortField"
+      [matSortDirection]="store.query().sortDirection"
+      (matSortChange)="sort($event)"
+    >
+      <ng-container matColumnDef="name">
+        <th
+          mat-header-cell
+          *matHeaderCellDef
+          mat-sort-header
+          sortActionDescription="Ordenar por nome"
+        >
+          Nome
+        </th>
+        <td mat-cell *matCellDef="let customer">
+          <a class="customer-link" [routerLink]="[customer.id]">{{ customer.name }}</a>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="document">
+        <th
+          mat-header-cell
+          *matHeaderCellDef
+          mat-sort-header
+          sortActionDescription="Ordenar por documento"
+        >
+          CPF ou CNPJ
+        </th>
+        <td mat-cell *matCellDef="let customer" class="document">
+          {{ customer.document | cpfCnpj }}
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="active">
+        <th
+          mat-header-cell
+          *matHeaderCellDef
+          mat-sort-header
+          sortActionDescription="Ordenar por situação"
+        >
+          Situação
+        </th>
+        <td mat-cell *matCellDef="let customer">{{ customer.active ? 'Ativo' : 'Inativo' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Ações</th>
+        <td mat-cell *matCellDef="let customer">
+          <div class="row-actions">
+            <a
+              mat-button
+              [routerLink]="[customer.id, 'edit']"
+              [attr.aria-label]="'Editar ' + customer.name"
+            >
+              Editar
+            </a>
+            <app-customer-status-action
+              [customer]="customer"
+              (statusChanged)="refreshAfterStatusChange()"
+            />
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr mat-row *matRowDef="let customer; columns: columns"></tr>
+      <tr *matNoDataRow>
+        <td class="table-message" [attr.colspan]="columns.length">
+          @switch (result.status) {
+            @case ('loading') {
+              <p role="status">Carregando clientes…</p>
+              <div class="table-skeleton" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+            }
+            @case ('failed') {
+              <p role="alert">{{ result.message }}</p>
+              <button mat-button type="button" (click)="store.reload()">Tentar novamente</button>
+            }
+            @case ('ready') {
+              <p role="status">
+                Nenhum cliente {{ store.query().active ? 'ativo' : 'inativo' }} encontrado.
+              </p>
+            }
+          }
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <mat-paginator
+    aria-label="Paginação dos clientes"
+    [length]="page()?.page?.totalElements ?? 0"
+    [pageIndex]="store.query().page"
+    [pageSize]="store.query().size"
+    [pageSizeOptions]="[5, 10, 20, 50]"
+    (page)="store.setPage($event.pageIndex, $event.pageSize)"
+  />
+</mat-card>

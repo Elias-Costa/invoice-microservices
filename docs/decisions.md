@@ -100,6 +100,7 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-062](#d-062--rotas-lazy-antes-das-telas-de-domínio) | 2026-11-20 | Rotas lazy antes das telas de domínio | aceita | — |
 | [D-063](#d-063--validação-do-código-no-cadastro-de-produtos) | 2026-11-20 | Validação do código no cadastro de produtos | aceita | — |
 | [D-064](#d-064--confirmação-de-saída-dos-formulários-de-produto) | 2026-11-20 | Confirmação de saída dos formulários de produto | aceita | — |
+| [D-065](#d-065--máscara-de-telefone-nos-dados-do-cliente) | 2026-11-20 | Máscara de telefone nos dados do cliente | aceita | — |
 
 ---
 
@@ -1007,5 +1008,19 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: o usuário pode permanecer no formulário ou descartar as alterações. Após uma gravação bem-sucedida, a navegação prossegue sem diálogo.
 - **Y-statement**: no contexto dos formulários de produto, diante do risco de perder alterações na navegação, decidimos aplicar o guard na F1-25 para que o usuário possa confirmar o descarte.
 - **Documentos afetados**: requisitos §9.3 (detalhamento registrado nesta decisão) · plano local de implementação (F1-25).
+- **ADR**: —
+- **Substitui**: —
+
+### D-065 — Máscara de telefone nos dados do cliente
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: o modelo de dados §5.2 prevê máscara para o telefone do cliente na interface e armazenamento apenas dos dígitos com DDI e DDD. A F1-26 precisava definir o formato exibido no formulário e no detalhe.
+- **Opções consideradas**: 1) máscara brasileira para números com DDI 55 e DDD, com formato internacional simples para os demais. 2) formato internacional simples para todos os números.
+- **Decisão**: usar máscara brasileira para números com DDI 55 e DDD. Para os demais, exibir `+` seguido dos dígitos. A API continua recebendo até 20 dígitos.
+- **Consequências**: o formulário aceita número de telefone formatado na interface e o detalhe usa a mesma apresentação. A API continua recebendo o telefone sem pontuação.
+- **Y-statement**: no contexto da interface de clientes, decidimos formatar os números brasileiros com DDI e DDD para facilitar a leitura e exibir os demais em formato internacional simples, preservando o armazenamento dos dígitos.
+- **Documentos afetados**: modelo de dados §5.2 (detalhamento registrado nesta decisão) · plano local de implementação (F1-26).
 - **ADR**: —
 - **Substitui**: —

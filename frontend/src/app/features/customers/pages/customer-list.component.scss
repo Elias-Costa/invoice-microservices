@@ -1,0 +1,79 @@
+.page-header,
+.filters,
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.page-header,
+.filters {
+  flex-wrap: wrap;
+}
+
+.page-header {
+  justify-content: space-between;
+  margin-block-end: 1.5rem;
+}
+
+.page-heading,
+.table-message p {
+  margin: 0;
+}
+
+.filters {
+  gap: 1rem 1.5rem;
+  padding: 1rem 1.25rem;
+}
+
+.filters mat-form-field {
+  flex: 1 1 18rem;
+  max-inline-size: 26rem;
+}
+
+.table-scroll {
+  overflow: auto;
+  border-block: 1px solid var(--invoice-border);
+}
+
+table,
+mat-paginator {
+  background: transparent;
+}
+
+table {
+  inline-size: 100%;
+  min-inline-size: 40rem;
+}
+
+.customer-link {
+  color: var(--mat-sys-primary);
+  font-weight: 650;
+  text-underline-offset: 0.2em;
+}
+
+.document {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.row-actions {
+  gap: 0;
+}
+
+.table-message {
+  padding: 1rem 1.25rem;
+  color: var(--invoice-muted);
+}
+
+.table-skeleton {
+  display: grid;
+  gap: 0.75rem;
+  margin-block-start: 1rem;
+}
+
+.table-skeleton span {
+  block-size: 1.5rem;
+  border-radius: 0.3rem;
+  background: var(--invoice-canvas);
+}

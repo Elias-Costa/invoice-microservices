@@ -58,6 +58,17 @@
         <span matListItemTitle>Produtos</span>
       </a>
 
+      <a
+        mat-list-item
+        routerLink="/customers"
+        routerLinkActive="active-link"
+        ariaCurrentWhenActive="page"
+        (click)="compact() && drawer.close()"
+      >
+        <span matListItemIcon class="nav-icon customers" aria-hidden="true"></span>
+        <span matListItemTitle>Clientes</span>
+      </a>
+
       @for (section of upcomingSections; track section.label) {
         <a mat-list-item disabled role="link">
           <span matListItemIcon [class]="'nav-icon ' + section.icon" aria-hidden="true"></span>

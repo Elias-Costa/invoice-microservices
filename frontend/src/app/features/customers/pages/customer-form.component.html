@@ -1,0 +1,86 @@
+@let editing = !!id();
+@let state = customer();
+@let back = editing ? ['/customers', id()] : ['/customers'];
+<a mat-button [routerLink]="back">{{ editing ? 'Voltar ao cliente' : 'Voltar aos clientes' }}</a>
+<h1 class="page-heading">{{ editing ? 'Editar cliente' : 'Novo cliente' }}</h1>
+
+<mat-card appearance="outlined" class="workspace-card">
+  @switch (state.status) {
+    @case ('loading') {
+      <p class="card-message" role="status">Carregando cliente…</p>
+    }
+    @case ('failed') {
+      <div class="card-message">
+        <p role="alert">{{ state.message }}</p>
+        <button mat-button type="button" (click)="retryLoad()">Tentar novamente</button>
+      </div>
+    }
+    @case ('ready') {
+      <form [formGroup]="form" (ngSubmit)="save()">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Nome ou razão social</mat-label>
+          <input #nameInput matInput formControlName="name" [readonly]="saving()" />
+          <mat-error>{{ fieldMessage(form.controls.name, 'Use até 150 caracteres.') }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>CPF ou CNPJ</mat-label>
+          <input
+            #documentInput
+            matInput
+            formControlName="document"
+            inputmode="numeric"
+            autocomplete="off"
+            [readonly]="saving()"
+            (input)="maskInput('document', documentInput)"
+          />
+          @if (editing) {
+            <mat-hint>O documento é definido no cadastro.</mat-hint>
+          }
+          <mat-error>{{
+            fieldMessage(form.controls.document, 'Informe um CPF ou CNPJ válido.')
+          }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>E-mail</mat-label>
+          <input
+            matInput
+            type="email"
+            formControlName="email"
+            autocomplete="email"
+            [readonly]="saving()"
+          />
+          <mat-error>{{
+            fieldMessage(form.controls.email, 'Informe um e-mail válido com até 150 caracteres.')
+          }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Telefone</mat-label>
+          <input
+            #phoneInput
+            matInput
+            type="tel"
+            formControlName="phone"
+            autocomplete="tel"
+            [readonly]="saving()"
+            (input)="maskInput('phone', phoneInput)"
+          />
+          <mat-hint>Inclua o DDI e o DDD.</mat-hint>
+          <mat-error>{{ fieldMessage(form.controls.phone, 'Informe até 20 dígitos.') }}</mat-error>
+        </mat-form-field>
+
+        @if (failure()) {
+          <p class="failure" role="alert">{{ failure() }}</p>
+        }
+        <div class="form-actions">
+          <a mat-button [routerLink]="back">Cancelar</a>
+          <button mat-flat-button type="submit" [disabled]="form.invalid || saving()">
+            {{ saving() ? 'Salvando…' : 'Salvar cliente' }}
+          </button>
+        </div>
+      </form>
+    }
+  }
+</mat-card>

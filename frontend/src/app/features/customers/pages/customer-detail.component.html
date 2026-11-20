@@ -1,0 +1,66 @@
+<a mat-button routerLink="/customers">Voltar aos clientes</a>
+
+@let state = customer();
+@switch (state.status) {
+  @case ('loading') {
+    <h1 class="page-heading">Cliente</h1>
+    <p role="status">Carregando cliente…</p>
+  }
+  @case ('failed') {
+    <h1 class="page-heading">Cliente</h1>
+    <p role="alert">{{ state.message }}</p>
+    <button mat-button type="button" (click)="reload()">Tentar novamente</button>
+  }
+  @case ('ready') {
+    @let item = state.data;
+    <header class="page-header">
+      <h1 class="page-heading">{{ item.name }}</h1>
+      <div class="actions">
+        <a mat-stroked-button routerLink="edit">Editar</a>
+        <app-customer-status-action [customer]="item" (statusChanged)="reload()" />
+      </div>
+    </header>
+
+    <mat-card appearance="outlined" class="workspace-card">
+      <h2>Dados cadastrais</h2>
+      <dl>
+        <div>
+          <dt>{{ item.documentType }}</dt>
+          <dd>{{ item.document | cpfCnpj }}</dd>
+        </div>
+        <div>
+          <dt>Situação</dt>
+          <dd>{{ item.active ? 'Ativo' : 'Inativo' }}</dd>
+        </div>
+        <div>
+          <dt>E-mail</dt>
+          <dd>{{ item.email || 'Não informado' }}</dd>
+        </div>
+        <div>
+          <dt>Telefone</dt>
+          <dd>{{ phone() || 'Não informado' }}</dd>
+        </div>
+      </dl>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="workspace-card">
+      <h2 id="recent-invoices">Últimas notas fiscais</h2>
+      @if (item.recentInvoices.length) {
+        <mat-list aria-labelledby="recent-invoices">
+          @for (invoice of item.recentInvoices; track invoice.id) {
+            <mat-list-item>
+              <span matListItemTitle>Nota nº {{ invoice.number }}</span>
+              <span matListItemLine>
+                {{ invoiceStatusLabels[invoice.status] }} ·
+                {{ invoice.createdAt | date: 'dd/MM/yyyy HH:mm' }}
+              </span>
+              <span matListItemLine>{{ invoice.total | currency: 'BRL' }}</span>
+            </mat-list-item>
+          }
+        </mat-list>
+      } @else {
+        <p>Nenhuma nota fiscal para este cliente.</p>
+      }
+    </mat-card>
+  }
+}
