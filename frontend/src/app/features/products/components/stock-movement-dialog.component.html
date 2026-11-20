@@ -1,0 +1,43 @@
+<h2 mat-dialog-title>Movimentar estoque</h2>
+<form [formGroup]="form" (ngSubmit)="save()">
+  <mat-dialog-content>
+    <fieldset [disabled]="saving()">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Tipo de movimentação</mat-label>
+        <select #typeInput matNativeControl formControlName="type">
+          <option value="INBOUND">Entrada</option>
+          <option value="OUTBOUND" [disabled]="!product.active">Saída</option>
+        </select>
+        @if (!product.active) {
+          <mat-hint>Produtos inativos permitem apenas entradas.</mat-hint>
+        }
+        <mat-error>{{ fieldMessage(form.controls.type, 'Escolha entrada ou saída.') }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Quantidade</mat-label>
+        <input matInput type="number" step="1" inputmode="numeric" formControlName="quantity" />
+        <mat-error>{{
+          fieldMessage(form.controls.quantity, 'Informe um inteiro entre 1 e 2.147.483.647.')
+        }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Motivo</mat-label>
+        <textarea matInput rows="3" formControlName="reason"></textarea>
+        <mat-error>{{ fieldMessage(form.controls.reason, 'Use até 200 caracteres.') }}</mat-error>
+      </mat-form-field>
+    </fieldset>
+
+    @if (failure()) {
+      <p class="failure" role="alert">{{ failure() }}</p>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close [disabled]="saving()">Cancelar</button>
+    <button mat-flat-button type="submit" [disabled]="form.invalid || saving()">
+      {{ saving() ? 'Registrando…' : 'Registrar movimentação' }}
+    </button>
+  </mat-dialog-actions>
+</form>

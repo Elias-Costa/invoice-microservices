@@ -36,7 +36,6 @@ export class AppComponent {
   );
 
   protected readonly upcomingSections = [
-    { label: 'Produtos', icon: 'products' },
     { label: 'Clientes', icon: 'customers' },
     { label: 'Notas fiscais', icon: 'invoices' },
     { label: 'Status do sistema', icon: 'status' },

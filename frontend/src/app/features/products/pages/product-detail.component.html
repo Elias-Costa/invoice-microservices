@@ -1,0 +1,128 @@
+<a mat-button routerLink="/products">Voltar aos produtos</a>
+@let state = product();
+@switch (state.status) {
+  @case ('loading') {
+    <h1 class="page-heading">Produto</h1>
+    <p role="status">Carregando produto…</p>
+  }
+  @case ('failed') {
+    <h1 class="page-heading">Produto</h1>
+    <p role="alert">{{ state.message }}</p>
+    <button mat-button type="button" (click)="reloadProduct()">Tentar novamente</button>
+  }
+  @case ('ready') {
+    @let item = state.data;
+    <header class="page-header">
+      <h1 class="page-heading">{{ item.description }}</h1>
+      <div class="product-actions">
+        <a mat-button routerLink="edit">Editar</a>
+        <app-product-status-action [product]="item" (statusChanged)="reloadProduct()" />
+        <button mat-flat-button type="button" (click)="move(item)">Movimentar</button>
+      </div>
+    </header>
+
+    <mat-card appearance="outlined" class="workspace-card summary-card">
+      <dl>
+        <div class="balance">
+          <dt>Saldo em estoque</dt>
+          <dd>{{ item.balance | number }}</dd>
+        </div>
+        <div>
+          <dt>Código</dt>
+          <dd>{{ item.code }}</dd>
+        </div>
+        <div>
+          <dt>Preço unitário</dt>
+          <dd>{{ item.unitPrice | currency: 'BRL' }}</dd>
+        </div>
+        <div>
+          <dt>Situação</dt>
+          <dd>{{ item.active ? 'Ativo' : 'Inativo' }}</dd>
+        </div>
+      </dl>
+    </mat-card>
+
+    <section aria-labelledby="movement-history-heading">
+      <h2 id="movement-history-heading">Histórico de movimentações</h2>
+      @let historyState = history();
+      <mat-card appearance="outlined" class="workspace-card">
+        <div
+          class="table-scroll"
+          role="region"
+          aria-labelledby="movement-history-heading"
+          tabindex="0"
+        >
+          <table
+            mat-table
+            [dataSource]="movementPage()?.content ?? []"
+            aria-label="Movimentações"
+            [attr.aria-busy]="historyState.status === 'loading'"
+          >
+            <ng-container matColumnDef="createdAt">
+              <th mat-header-cell *matHeaderCellDef>Data</th>
+              <td mat-cell *matCellDef="let movement" class="nowrap">
+                {{ movement.createdAt | date: 'dd/MM/yyyy HH:mm' }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="type">
+              <th mat-header-cell *matHeaderCellDef>Tipo</th>
+              <td mat-cell *matCellDef="let movement">{{ movementLabel(movement.type) }}</td>
+            </ng-container>
+            <ng-container matColumnDef="quantity">
+              <th mat-header-cell *matHeaderCellDef>Quantidade</th>
+              <td mat-cell *matCellDef="let movement">{{ movement.quantity | number }}</td>
+            </ng-container>
+            <ng-container matColumnDef="balanceAfter">
+              <th mat-header-cell *matHeaderCellDef>Saldo após</th>
+              <td mat-cell *matCellDef="let movement">{{ movement.balanceAfter | number }}</td>
+            </ng-container>
+            <ng-container matColumnDef="reason">
+              <th mat-header-cell *matHeaderCellDef>Motivo</th>
+              <td mat-cell *matCellDef="let movement">{{ movement.reason ?? '—' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="reference">
+              <th mat-header-cell *matHeaderCellDef>Referência</th>
+              <td mat-cell *matCellDef="let movement" [attr.title]="movement.referenceId">
+                {{ movement.referenceNumber === null ? '—' : 'NF ' + movement.referenceNumber }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="createdBy">
+              <th mat-header-cell *matHeaderCellDef>Usuário</th>
+              <td mat-cell *matCellDef="let movement">{{ movement.createdBy }}</td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="columns"></tr>
+            <tr mat-row *matRowDef="let movement; columns: columns"></tr>
+            <tr *matNoDataRow>
+              <td class="table-message" [attr.colspan]="columns.length">
+                @switch (historyState.status) {
+                  @case ('loading') {
+                    <p role="status">Carregando movimentações…</p>
+                    <div class="table-skeleton" aria-hidden="true"></div>
+                  }
+                  @case ('failed') {
+                    <p role="alert">{{ historyState.message }}</p>
+                    <button mat-button type="button" (click)="reloadHistory()">
+                      Tentar novamente
+                    </button>
+                  }
+                  @case ('ready') {
+                    <p role="status">Nenhuma movimentação encontrada.</p>
+                  }
+                }
+              </td>
+            </tr>
+          </table>
+        </div>
+        <mat-paginator
+          aria-label="Paginação das movimentações"
+          [length]="movementPage()?.page?.totalElements ?? 0"
+          [pageIndex]="pageIndex()"
+          [pageSize]="pageSize()"
+          [pageSizeOptions]="[5, 10, 20, 50]"
+          (page)="setPage($event)"
+        />
+      </mat-card>
+    </section>
+  }
+}

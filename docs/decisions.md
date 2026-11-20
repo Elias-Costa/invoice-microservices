@@ -98,6 +98,8 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-060](#d-060--origem-da-api-e-imagens-do-frontend) | 2026-11-20 | Origem da API e imagens do frontend | aceita | — |
 | [D-061](#d-061--feedback-e-repetição-de-requisições-no-frontend) | 2026-11-20 | Feedback e repetição de requisições no frontend | aceita | — |
 | [D-062](#d-062--rotas-lazy-antes-das-telas-de-domínio) | 2026-11-20 | Rotas lazy antes das telas de domínio | aceita | — |
+| [D-063](#d-063--validação-do-código-no-cadastro-de-produtos) | 2026-11-20 | Validação do código no cadastro de produtos | aceita | — |
+| [D-064](#d-064--confirmação-de-saída-dos-formulários-de-produto) | 2026-11-20 | Confirmação de saída dos formulários de produto | aceita | — |
 
 ---
 
@@ -977,5 +979,33 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: é possível verificar a navegação direta e o carregamento por rota enquanto o menu indica as telas disponíveis.
 - **Y-statement**: no contexto da entrega incremental do frontend, decidimos preparar as rotas e habilitar a navegação do menu quando cada tela for entregue.
 - **Documentos afetados**: plano local de implementação (F1-24 a F1-27).
+- **ADR**: —
+- **Substitui**: —
+
+### D-063 — Validação do código no cadastro de produtos
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: RF-PRD-01 prevê validação síncrona no formulário e retorno de `409 product-code-already-exists` pela API. O §9.4 cita um validador assíncrono, e a API oferece apenas busca parcial com filtros separados de situação.
+- **Opções consideradas**: validar localmente o formato e exibir a duplicidade após o cadastro ou consultar a busca de ativos e inativos enquanto o usuário digita.
+- **Decisão**: validar o formato no formulário e exibir o `409 product-code-already-exists` no campo Código. A API verifica a unicidade na gravação.
+- **Consequências**: a duplicidade é informada no envio do formulário, inclusive para códigos inativos. A verificação usa o contrato de cadastro existente.
+- **Y-statement**: no contexto do cadastro, diante da busca parcial e da necessidade de verificar o código entre produtos de ambas as situações, decidimos usar a verificação de unicidade do cadastro para exibir uma mensagem no campo correto.
+- **Documentos afetados**: requisitos RF-PRD-01 e §9.4 (detalhamento registrado nesta decisão) · plano local de implementação (F1-25).
+- **ADR**: —
+- **Substitui**: —
+
+### D-064 — Confirmação de saída dos formulários de produto
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: requisitos §9.3 prevê confirmação de navegação para formulários com alterações pendentes. O plano mencionava explicitamente o guard na entrega das notas fiscais.
+- **Opções consideradas**: aplicar a confirmação aos formulários de produto na F1-25 ou deixar a proteção para os formulários de nota na F1-27.
+- **Decisão**: incluir confirmação ao sair do cadastro ou da edição de produto com alterações não salvas, usando `canDeactivate`.
+- **Consequências**: o usuário pode permanecer no formulário ou descartar as alterações. Após uma gravação bem-sucedida, a navegação prossegue sem diálogo.
+- **Y-statement**: no contexto dos formulários de produto, diante do risco de perder alterações na navegação, decidimos aplicar o guard na F1-25 para que o usuário possa confirmar o descarte.
+- **Documentos afetados**: requisitos §9.3 (detalhamento registrado nesta decisão) · plano local de implementação (F1-25).
 - **ADR**: —
 - **Substitui**: —

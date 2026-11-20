@@ -1,3 +1,5 @@
+export const PRODUCT_CODE_ALREADY_EXISTS = 'urn:problem-type:product-code-already-exists';
+
 export interface BatchProductResponse {
   id: string;
   code: string;

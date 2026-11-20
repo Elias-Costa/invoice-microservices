@@ -12,6 +12,7 @@ import { MatSnackBar, MatSnackBarDismiss } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { readProblemDetail } from '../../shared/models/problem-detail';
+import { PRODUCT_CODE_ALREADY_EXISTS } from '../../shared/models/stock';
 import { ApiActivity } from './api-activity';
 import { ALLOW_UNAVAILABLE_RETRY, errorInterceptor } from './error.interceptor';
 import {
@@ -110,16 +111,34 @@ describe('errorInterceptor', () => {
     expect(navigate).toHaveBeenCalledWith(['/forbidden']);
   });
 
-  it('shows the conflict detail and reloads after a 409 only through the action', () => {
-    const message = 'A nota foi alterada por outra requisição.';
-    http.put(url, {}).subscribe({ error: () => undefined });
+  it('shows the product edit conflict and reloads only through the action', () => {
+    const productUrl = '/api/stock/products/product-id';
+    const message = 'O produto foi alterado por outra requisição.';
+    http.put(productUrl, {}).subscribe({ error: () => undefined });
     requests
-      .expectOne(url)
-      .flush({ detail: message }, { status: 409, statusText: 'Conflict', headers: problemHeaders });
+      .expectOne(productUrl)
+      .flush(
+        { type: 'urn:problem-type:optimistic-lock-conflict', detail: message },
+        { status: 409, statusText: 'Conflict', headers: problemHeaders },
+      );
     expect(snackbar.open).toHaveBeenCalledWith(message, 'Recarregar', expect.any(Object));
     expect(reload).not.toHaveBeenCalled();
     action.next();
     expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it('leaves duplicate product codes to the product form', () => {
+    const onError = vi.fn();
+    const products = '/api/stock/products';
+    http.post(products, {}).subscribe({ error: onError });
+    requests
+      .expectOne(products)
+      .flush(
+        { type: PRODUCT_CODE_ALREADY_EXISTS },
+        { status: 409, statusText: 'Conflict', headers: problemHeaders },
+      );
+    expect(onError).toHaveBeenCalledOnce();
+    expect(snackbar.open).not.toHaveBeenCalled();
   });
 
   it('repeats a read only when the user selects the persistent snackbar action', () => {

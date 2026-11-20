@@ -1,0 +1,110 @@
+@let editing = !!id();
+@let state = product();
+<a mat-button [routerLink]="editing ? ['/products', id()] : ['/products']">
+  {{ editing ? 'Voltar ao produto' : 'Voltar aos produtos' }}
+</a>
+<h1 class="page-heading">{{ editing ? 'Editar produto' : 'Novo produto' }}</h1>
+
+<mat-card appearance="outlined" class="workspace-card">
+  @switch (state.status) {
+    @case ('loading') {
+      <p class="card-message" role="status">Carregando produto…</p>
+    }
+    @case ('failed') {
+      <div class="card-message">
+        <p role="alert">{{ state.message }}</p>
+        <button mat-button type="button" (click)="retryLoad()">Tentar novamente</button>
+      </div>
+    }
+    @case ('ready') {
+      <form [formGroup]="form" (ngSubmit)="save()">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Código</mat-label>
+          <input
+            #codeInput
+            matInput
+            formControlName="code"
+            autocomplete="off"
+            spellcheck="false"
+            [readonly]="saving()"
+            (input)="uppercaseCode()"
+          />
+          @if (editing) {
+            <mat-hint>O código é definido no cadastro.</mat-hint>
+          }
+          <mat-error>{{
+            fieldMessage(
+              form.controls.code,
+              'Use de 1 a 30 letras sem acento, números ou . _ -, começando por letra ou número.'
+            )
+          }}</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Descrição</mat-label>
+          <textarea
+            #descriptionInput
+            matInput
+            rows="3"
+            formControlName="description"
+            [readonly]="saving()"
+          ></textarea>
+          <mat-error>{{
+            fieldMessage(form.controls.description, 'Use até 200 caracteres.')
+          }}</mat-error>
+        </mat-form-field>
+
+        <div class="numeric-fields">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Preço unitário (R$)</mat-label>
+            <input
+              matInput
+              type="number"
+              inputmode="decimal"
+              step="any"
+              formControlName="unitPrice"
+              [readonly]="saving()"
+            />
+            <mat-error>{{
+              fieldMessage(
+                form.controls.unitPrice,
+                'Informe um preço de 0 até R$ 9.999.999.999.999,99.'
+              )
+            }}</mat-error>
+          </mat-form-field>
+
+          @if (!editing) {
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Saldo inicial</mat-label>
+              <input
+                matInput
+                type="number"
+                inputmode="numeric"
+                step="1"
+                formControlName="initialBalance"
+                [readonly]="saving()"
+              />
+              <mat-error>{{
+                fieldMessage(
+                  form.controls.initialBalance,
+                  'Informe um inteiro entre 0 e 2.147.483.647.'
+                )
+              }}</mat-error>
+            </mat-form-field>
+          }
+        </div>
+
+        @if (failure()) {
+          <p class="failure" role="alert">{{ failure() }}</p>
+        }
+
+        <div class="form-actions">
+          <a mat-button [routerLink]="editing ? ['/products', id()] : ['/products']">Cancelar</a>
+          <button mat-flat-button type="submit" [disabled]="form.invalid || saving()">
+            {{ saving() ? 'Salvando…' : 'Salvar produto' }}
+          </button>
+        </div>
+      </form>
+    }
+  }
+</mat-card>

@@ -12,6 +12,7 @@ import { Router } from '@angular/router';
 import { catchError, defer, finalize, switchMap, take, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { readProblemDetail } from '../../shared/models/problem-detail';
+import { PRODUCT_CODE_ALREADY_EXISTS } from '../../shared/models/stock';
 import { ApiActivity } from './api-activity';
 import { IDEMPOTENCY_KEY, IDEMPOTENT_POST } from './idempotency.interceptor';
 import { UnavailableNoticeComponent } from './unavailable-notice.component';
@@ -59,19 +60,20 @@ export const errorInterceptor: HttpInterceptorFn = (request, next) => {
         case 404:
           snackbar.open('Não encontrado.', 'Fechar', { duration: SNACKBAR_DURATION });
           break;
-        case 409:
+        case 409: {
+          const problem = readProblemDetail(error);
+          if (problem?.type === PRODUCT_CODE_ALREADY_EXISTS) {
+            break;
+          }
           snackbar
-            .open(
-              readProblemDetail(error)?.detail ?? 'Conflito ao processar a solicitação.',
-              'Recarregar',
-              {
-                duration: SNACKBAR_DURATION,
-              },
-            )
+            .open(problem?.detail ?? 'Conflito ao processar a solicitação.', 'Recarregar', {
+              duration: SNACKBAR_DURATION,
+            })
             .onAction()
             .pipe(take(1))
             .subscribe(() => document.defaultView?.location.reload());
           break;
+        }
         case 503: {
           const retryAllowed = canRetry(request);
           const notice = snackbar.openFromComponent(UnavailableNoticeComponent, {

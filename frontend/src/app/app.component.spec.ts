@@ -36,7 +36,8 @@ describe('AppComponent', () => {
     expect(navigation?.querySelector('a[aria-current="page"]')?.textContent).toContain(
       'Visão geral',
     );
-    expect(navigation?.querySelectorAll('[aria-disabled="true"]')).toHaveLength(4);
+    expect(navigation?.querySelector('a[href="/products"]')?.textContent).toContain('Produtos');
+    expect(navigation?.querySelectorAll('[aria-disabled="true"]')).toHaveLength(3);
   });
 
   it('opens the forbidden page and returns home through its link', async () => {
@@ -58,7 +59,6 @@ describe('AppComponent', () => {
   });
 
   it.each([
-    ['/products', 'Produtos'],
     ['/customers', 'Clientes'],
     ['/invoices', 'Notas fiscais'],
   ])('opens the provisional page for %s by URL', async (url, title) => {
@@ -72,7 +72,7 @@ describe('AppComponent', () => {
     expect(shell.querySelector('[role="main"]')?.textContent).toContain(
       'Esta seção ainda está indisponível.',
     );
-    expect(shell.querySelectorAll('[aria-disabled="true"]')).toHaveLength(4);
+    expect(shell.querySelectorAll('[aria-disabled="true"]')).toHaveLength(3);
   });
 
   it('announces a network failure and hides it after the API responds', async () => {

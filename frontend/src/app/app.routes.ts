@@ -9,10 +9,8 @@ export const routes: Routes = [
   },
   {
     path: 'products',
-    title: 'Produtos | Notas Fiscais',
-    data: { heading: 'Produtos' },
-    loadComponent: () =>
-      import('./shared/unavailable-page.component').then((page) => page.UnavailablePageComponent),
+    loadChildren: () =>
+      import('./features/products/product.routes').then((feature) => feature.productRoutes),
   },
   {
     path: 'customers',
