@@ -46,7 +46,7 @@ Dois bancos PostgreSQL independentes, um por microsserviço:
 | `stock_db` | `stock-service` | Produtos, movimentações de estoque, registro de baixas por nota, tabelas técnicas |
 | `billing_db` | `billing-service` | Clientes, notas fiscais, itens, histórico de status, tabelas técnicas |
 
-Keycloak usa seu próprio banco (H2 embutido em dev ou PostgreSQL dedicado); não faz parte deste modelo.
+Os dois bancos atendem à demonstração da `v0.1.0`. A proposta de autenticação da F2 prevê um banco próprio para o Keycloak. [Decisão de escopo (D-029)](decisions.md#d-029--encerramento-da-implementação-na-f1)
 
 ---
 
@@ -814,7 +814,7 @@ Jobs são idempotentes e registram métrica `cleanup_rows_deleted_total{table}`.
 
 ## 13. Dados de demonstração (seed)
 
-Carregados por `R__seed_demo.sql` no perfil `demo`. Ids são fixos para que os dois bancos fiquem coerentes entre si (o Faturamento referencia produtos do Estoque) e para que roteiros de demonstração e testes E2E sejam determinísticos.
+O perfil `demo`, ativo por padrão no Compose, habilita a carga de dados pela migração repetível `R__seed_demo.sql` de cada serviço de domínio. Os IDs fixos mantêm as referências entre os dois bancos e permitem que os roteiros identifiquem os registros em uma instância com o seed intacto.
 
 ### 13.1 Produtos (`stock_db.products`)
 
@@ -865,7 +865,7 @@ Documentos com dígitos verificadores válidos.
 
 | nº | `id` | Cliente | Status | Itens (código × qtd @ preço) | Total | Papel na demo |
 |---|---|---|---|---|---|---|
-| 1 | `b…01` | #1 | `CLOSED` | `PAR-M6-20` × 100 @ 0,35; `POR-M6` × 100 @ 0,20 | 55,00 | Nota fechada com PDF disponível; `current_print_request_id = d…01` |
+| 1 | `b…01` | #1 | `CLOSED` | `PAR-M6-20` × 100 @ 0,35 e `POR-M6` × 100 @ 0,20 | 55,00 | Nota fechada, com duas movimentações de baixa e `current_print_request_id = d…01` |
 | 2 | `b…02` | #2 | `CANCELED` | `MAR-500` × 1 @ 45,00; `CHV-FEN-6` × 2 @ 12,90 | 70,80 | `cancel_reason = 'Pedido duplicado'` |
 | 3 | `b…03` | #3 | `OPEN` | `TRE-5M` × 1 @ 22,00 | 22,00 | **Concorrência** (imprimir junto com a 4) |
 | 4 | `b…04` | #4 | `OPEN` | `TRE-5M` × 1 @ 22,00; `FIT-ISO-19` × 5 @ 4,50 | 44,50 | **Concorrência** (imprimir junto com a 3) |
@@ -883,12 +883,14 @@ Após o seed, a sequência fica no mínimo em 5 e a primeira nota criada em um b
 
 ### 13.7 Roteiro de demonstração habilitado pelo seed
 
-1. **Fluxo feliz**: criar nota com `ARR-M6` × 50 → imprimir → `CLOSED`, saldo 950, PDF.
-2. **Saldo insuficiente**: imprimir NF 5 → volta a `OPEN` com "Saldo insuficiente para BRO-ACO-8 (solicitado 2, disponível 0)".
+1. **Fluxo feliz**: criar nota com `ARR-M6` × 50 e imprimir. A nota chega a `CLOSED` e o saldo fica em 950, com uma única baixa.
+2. **Saldo insuficiente**: imprimir NF 5. A nota volta a `OPEN` com "Saldo insuficiente para BRO-ACO-8 (solicitado 2, disponível 0)" e os saldos dos dois itens permanecem iguais.
 3. **Concorrência**: imprimir NF 3 e NF 4 ao mesmo tempo (duas abas ou script) → exatamente uma fecha; `TRE-5M` fica com saldo 0.
 4. **Produto inativo**: tentar adicionar `SER-MAN-22` a uma nota → `422 product-inactive`.
-5. **Falha de serviço**: `docker compose stop stock-service` → imprimir nota → `PROCESSING` → `start` → fecha sozinha.
+5. **Falha de serviço**: criar uma nota, parar o Estoque com `docker compose stop stock-service` e imprimir. A nota fica em `PROCESSING` e fecha automaticamente após `docker compose start stock-service`.
 6. **Idempotência**: reenviar `POST /invoices` com a mesma `Idempotency-Key` → mesma nota, mesmo número.
+
+Os cenários 1, 2, 3, 5 e 6 têm scripts Bash que verificam o comportamento pelo Gateway. [Roteiro de demonstração](../README.md#demonstração)
 
 ---
 

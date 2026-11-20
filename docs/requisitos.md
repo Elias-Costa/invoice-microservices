@@ -6,7 +6,8 @@
 | Versão do documento | 1.0 |
 | Data | 2026-09-12 |
 | Status | Aprovado para desenvolvimento |
-| Stack | Java 21 · Spring Boot 4 · Spring Cloud Gateway · Apache Kafka · PostgreSQL · Keycloak · Angular 20+ · Angular Material · Docker Compose |
+| Escopo da entrega | F1 (`v0.1.0`), com F2 e F3 como evoluções possíveis (D-029) |
+| Stack da v0.1.0 | Java 21 · Spring Boot 4 · Spring Cloud Gateway · Apache Kafka · PostgreSQL · Angular 22 · Angular Material · Nginx · Docker Compose |
 
 ---
 
@@ -37,7 +38,7 @@ Este documento especifica os requisitos funcionais, não funcionais, regras de n
 
 ### 1.2 Escopo do produto
 
-Sistema web para cadastro de produtos com controle de estoque, cadastro de clientes e emissão de notas fiscais. A "emissão" (impressão) de uma nota fecha a nota, baixa o estoque dos produtos envolvidos e disponibiliza um PDF. O sistema é composto por dois microsserviços de domínio (Estoque e Faturamento), um API Gateway, um provedor de identidade e um frontend Angular, todos executáveis localmente com um único comando.
+Sistema web para cadastro de produtos com controle de estoque, cadastro de clientes e emissão de notas fiscais. Na `v0.1.0`, a ação **Imprimir** inicia o fechamento assíncrono da nota e a baixa de estoque. O Docker Compose sobe o Estoque, o Faturamento, o Gateway, o frontend Angular, os bancos PostgreSQL e o Kafka. A F2 descreve possíveis evoluções como autenticação com Keycloak e geração de PDF. [Decisão de escopo (D-029)](decisions.md#d-029--encerramento-da-implementação-na-f1)
 
 O sistema **não** integra com SEFAZ nem gera documentos fiscais eletrônicos reais (NF-e/DANFE). "Nota fiscal" aqui é um documento interno simplificado.
 
@@ -67,7 +68,7 @@ Idioma: documentação em português (pt-BR); código, identificadores, nomes de
 | Movimentação (StockMovement) | Registro imutável de entrada ou saída de estoque, com saldo resultante. |
 | Cliente (Customer) | Destinatário de uma nota fiscal, cadastrado no Faturamento. |
 | Nota fiscal (Invoice) | Documento com numeração sequencial, cliente, itens (produto + quantidade + preço) e status. |
-| Impressão / Fechamento | Ação que inicia a Saga de baixa de estoque e, se bem-sucedida, leva a nota ao status `CLOSED` e disponibiliza o PDF. |
+| Impressão / Fechamento | Ação que inicia a Saga de baixa de estoque. A confirmação da baixa leva a nota ao status `CLOSED`. |
 | Saga | Transação distribuída coordenada por eventos entre Faturamento e Estoque. |
 | Outbox | Tabela transacional onde eventos são gravados junto com a mudança de estado, para publicação posterior no Kafka. |
 | Idempotência | Propriedade pela qual repetir uma operação não produz efeito adicional. |
@@ -78,6 +79,8 @@ Idioma: documentação em português (pt-BR); código, identificadores, nomes de
 ---
 
 ## 2. Visão geral do produto
+
+Os diagramas C4 e os perfis desta seção descrevem a arquitetura prevista com autenticação e observabilidade da F2. O README apresenta os componentes executáveis na v0.1.0. [Arquitetura da v0.1.0](../README.md#arquitetura)
 
 ### 2.1 Objetivos
 
@@ -255,7 +258,7 @@ Cada requisito traz prioridade (MoSCoW), fase de entrega e critérios de aceite 
 
 **RF-PRD-06 — Consulta em lote (interna).** Usada pelo `billing-service` para validar itens de nota.
 - CA1: `GET /api/stock/products/batch?ids=a,b,c` → `200` com lista de `{id, code, description, unitPrice, balance, active}`; ids inexistentes são omitidos.
-- CA2: Exige role `SERVICE`, `OPERATOR` ou `ADMIN`.
+- CA2 (F2): Exige role `SERVICE`, `OPERATOR` ou `ADMIN`.
 
 ### 3.3 Movimentação de estoque (RF-STK)
 
@@ -363,7 +366,7 @@ Cada requisito traz prioridade (MoSCoW), fase de entrega e critérios de aceite 
 
 **RF-PRT-02 — Indicador de processamento.** Após o `202`, a UI exibe indicador de processamento (barra/spinner + chip `PROCESSING`) e faz polling em `GET /api/billing/invoices/{id}` a cada 1,5 s até o status sair de `PROCESSING`, com limite de 30 s.
 - CA1: Polling implementado com `timer(0, 1500).pipe(switchMap(...), takeWhile(status === 'PROCESSING', true), timeout(30000), takeUntilDestroyed())`.
-- CA2: Ao concluir (`CLOSED`), snackbar de sucesso e botão "Baixar PDF" fica disponível.
+- CA2: Ao concluir (`CLOSED`), a interface exibe snackbar de sucesso. O botão "Baixar PDF" é previsto em RF-PRT-05 (F2).
 - CA3: Ao atingir 30 s ainda em `PROCESSING`: mensagem "A nota continua em processamento. O serviço de estoque pode estar indisponível; a operação será concluída automaticamente quando ele se recuperar." Polling encerra; usuário pode recarregar manualmente.
 - CA4: Navegar para fora da tela cancela o polling (sem vazamento de subscription).
 
@@ -392,9 +395,9 @@ Cada requisito traz prioridade (MoSCoW), fase de entrega e critérios de aceite 
 | RF-RES-03 | Circuit breaker nas chamadas síncronas ao Estoque | Must | F1 |
 | RF-RES-04 | Página de status do sistema | Should | F2 |
 
-**RF-RES-01 — Feedback de erros.** Interceptor HTTP global converte `ProblemDetail` em mensagens ao usuário: `400/422` → erros no formulário/campo; `401` → redireciona ao login; `403` → página "Sem permissão"; `404` → página/snackbar "Não encontrado"; `409` → snackbar com ação "Recarregar"; `503` → snackbar persistente com ação "Tentar novamente"; erro de rede → banner "Sem conexão com o servidor".
+**RF-RES-01 — Feedback de erros.** O interceptor HTTP global converte `ProblemDetail` em mensagens ao usuário. Erros `400/422` aparecem no formulário ou campo, `401` gera um snackbar na F1, `403` abre a página "Sem permissão", `404` é informado na página ou em snackbar, e `409` oferece "Recarregar". Em `503`, "Tentar novamente" é oferecido para leituras, POSTs marcados como idempotentes e outras escritas explicitamente autorizadas pela tela. A repetição preserva a chave de idempotência. Um erro de rede aciona o banner "Sem conexão com o servidor". O redirecionamento para login pertence à F2. [Feedback e repetição de requisições (D-061)](decisions.md#d-061--feedback-e-repetição-de-requisições-no-frontend)
 - CA1: Toda mensagem exibida ao usuário é legível (sem stack trace ou JSON bruto).
-- CA2: Cada erro exibido inclui o `traceId` (discreto, copiável) para correlação com logs/Zipkin.
+- CA2 (F2): Cada erro exibido inclui o `traceId` (discreto, copiável) para correlação com logs e Zipkin. A F1 já disponibiliza o identificador nas respostas da API pelo Gateway (D-059).
 
 **RF-RES-02 — Recuperação (assíncrono).** Cenário obrigatório de falha: com o `stock-service` parado (`docker compose stop stock-service`), o usuário imprime uma nota.
 - CA1: A nota fica `PROCESSING`; a UI informa após o timeout (RF-PRT-02 CA3).
@@ -543,7 +546,7 @@ sequenceDiagram
     B->>B: dedupe; PROCESSING → CLOSED
     FE->>B: GET /invoices/{id}
     B-->>FE: status CLOSED
-    FE-->>U: snackbar "Nota fechada"; botão Baixar PDF
+    FE-->>U: snackbar de fechamento
 ```
 
 ### 6.3 Fechamento — saldo insuficiente
@@ -676,7 +679,7 @@ Teste automatizado reproduz o cenário com dois threads e `CountDownLatch` sobre
 
 | ID | Requisito |
 |---|---|
-| RNF-RUN-01 | `docker compose up --build` sobe todo o sistema; perfil `observability` adiciona Prometheus/Grafana/Zipkin; perfil `tools` adiciona Kafka UI. |
+| RNF-RUN-01 | `docker compose up --build` sobe a stack da F1. O perfil `tools` disponibiliza a Kafka UI. O perfil `observability` (Prometheus, Grafana e Zipkin) é previsto na F2. |
 | RNF-RUN-02 | Pré-requisitos do avaliador: Docker 24+ e Docker Compose v2. Para desenvolvimento: JDK 21, Node 22, Maven 3.9 (ou wrapper). |
 | RNF-RUN-03 | Imagens Docker multi-stage; JRE mínimo (`eclipse-temurin:21-jre-alpine` ou distroless); usuário não-root. |
 | RNF-RUN-04 | Tempo de subida completa (cold start) < 2 min em máquina de desenvolvimento típica. |
@@ -714,35 +717,35 @@ Teste automatizado reproduz o cenário com dois threads e `CountDownLatch` sobre
 | Resiliência | Resilience4j (spring-boot starter) | Circuit breaker, retry, time limiter, métricas prontas |
 | Persistência | PostgreSQL 16, Hibernate 7, Flyway | Confiabilidade, sequences, constraints; migrações versionadas |
 | Mensageria | Apache Kafka (KRaft, sem ZooKeeper) | Log durável, replay, particionamento por chave; muito valorizado em vagas |
-| Identidade | Keycloak 26 | OIDC/OAuth2 completo, realm exportável, client credentials |
+| Identidade (F2) | Keycloak 26 | OIDC/OAuth2 completo, realm exportável, client credentials |
 | Mapeamento | MapStruct | Mapeamento explícito gerado em compile-time |
 | Validação | Jakarta Bean Validation (Hibernate Validator) | Validação declarativa |
-| PDF | OpenPDF | Licença permissiva, API simples |
+| PDF (F2) | OpenPDF | Licença permissiva, API simples |
 | Erros | `ProblemDetail` (RFC 9457) nativo do Spring Framework | Formato padronizado sem dependências extras |
-| Observabilidade | Micrometer, Micrometer Tracing (Brave), Prometheus, Grafana, Zipkin, Logstash Logback Encoder | Stack open-source consolidada |
-| Documentação de API | springdoc-openapi, AsyncAPI | Geração automática + contrato de eventos |
+| Observabilidade | Micrometer e exposição de métricas pelo Actuator na F1. Tracing com Brave, stack Prometheus/Grafana/Zipkin e Logstash Logback Encoder previstos na F2 | Métricas de serviço e evolução para tracing distribuído |
+| Documentação de API (F2) | springdoc-openapi, AsyncAPI | Geração automática e contrato de eventos |
 | Build | Maven 3.9 multi-módulo (wrapper) | Mais reconhecido em vagas Java |
-| Testes backend | JUnit 5, Mockito, AssertJ, Spring Boot Test, Testcontainers (PostgreSQL, Kafka), Spring Cloud Contract, ArchUnit, JaCoCo | Cobertura em múltiplos níveis |
-| Frontend | Angular 20+ (standalone, signals, control flow), TypeScript strict, RxJS 7 | Angular moderno |
-| UI | Angular Material 20+, Angular CDK | Componentes acessíveis e reconhecíveis |
-| Autenticação frontend | keycloak-angular + keycloak-js | Integração oficial com PKCE, guards e interceptor |
-| Testes frontend | Vitest (builder `@angular/build:unit-test`) + Angular Testing Library (opcional); Playwright (E2E) | Rápido e moderno |
+| Testes backend | JUnit Jupiter, Mockito, AssertJ, Spring Boot Test, Testcontainers (PostgreSQL e Kafka), ArchUnit e JaCoCo. Spring Cloud Contract previsto na F2 | Cobertura em múltiplos níveis |
+| Frontend | Angular 22 (standalone, signals, control flow), TypeScript strict, RxJS 7 | Angular moderno |
+| UI | Angular Material 22, Angular CDK | Componentes acessíveis e reconhecíveis |
+| Autenticação frontend (F2) | keycloak-angular + keycloak-js | Integração com PKCE, guards e interceptor |
+| Testes frontend | Vitest (builder `@angular/build:unit-test`). Playwright para E2E previsto na F3 | Testes locais de componentes e serviços |
 | Infra local | Docker Compose v2, Dockerfiles multi-stage, Nginx (serve o SPA) | One-command |
-| CI/CD | GitHub Actions, GHCR | Build, testes, imagens, releases |
+| CI/CD (F3) | GitHub Actions, GHCR | Build, testes, imagens, releases |
 
 ### 8.2 Componentes e responsabilidades
 
-| Componente | Responsabilidade | Porta (host) |
+| Componente da v0.1.0 | Responsabilidade | Porta no host |
 |---|---|---|
-| `frontend` | SPA Angular servida por Nginx; proxy de `/api` → gateway em produção-local | 4200 |
-| `api-gateway` | Roteamento `/api/stock/**` → `stock-service`, `/api/billing/**` → `billing-service`; validação de JWT; CORS; propagação de `traceparent`; rate limiting básico (Could) | 8080 |
-| `stock-service` | Produtos, movimentações, baixa por nota, chaos endpoint | 8081 |
-| `billing-service` | Clientes, notas, Saga de fechamento, PDF, reconciliação | 8082 |
-| `keycloak` | Realm `invoice` importado na subida | 8180 |
+| `frontend` | SPA Angular servida por Nginx com proxy de `/api` para o Gateway | 4200 |
+| `api-gateway` | Roteamento de `/api/stock/**` e `/api/billing/**`, CORS e correlação por `X-Trace-Id` (D-059) | 8080 |
+| `stock-service` | Produtos, movimentações e baixa por nota | 8081 |
+| `billing-service` | Clientes, notas e Saga de fechamento | 8082 |
 | `postgres-stock` / `postgres-billing` | Bancos isolados | 5433 / 5434 |
-| `kafka` | Broker KRaft, tópicos criados por `KafkaAdmin` dos serviços | 9092 |
-| `kafka-ui` (perfil `tools`) | Inspeção de tópicos/mensagens | 8090 |
-| `prometheus` / `grafana` / `zipkin` (perfil `observability`) | Métricas, dashboards, traces | 9090 / 3000 / 9411 |
+| `kafka` | Broker KRaft, com tópicos criados pelo `KafkaAdmin` dos serviços | 9092 |
+| `kafka-ui` (perfil `tools`) | Inspeção de tópicos e mensagens | 8090 |
+
+Keycloak (`8180`) e o perfil `observability` com Prometheus (`9090`), Grafana (`3000`) e Zipkin (`9411`) fazem parte da proposta da F2. [Plano de entrega](#11-plano-de-entrega)
 
 ### 8.3 Estrutura do repositório
 
@@ -1097,14 +1100,16 @@ resilience4j:
 
 ### 8.13 Ambiente de execução
 
-- `docker-compose.yml` com serviços listados em [§8.2](#82-componentes-e-responsabilidades), redes `edge` (frontend, gateway, keycloak) e `internal` (serviços, bancos, kafka); bancos e Kafka publicam portas apenas na interface de loopback do host (`127.0.0.1:5433`, `127.0.0.1:5434`, `127.0.0.1:9092`) para desenvolvimento local — dentro da rede `internal` os serviços usam `postgres-stock:5432`, `postgres-billing:5432` e `kafka:9092` (D-018).
-- Perfil Spring `docker` ativa hosts internos; perfil `demo` ativa seed (Flyway `R__seed_demo.sql`) e chaos.
+- O Compose sobe os serviços da F1 e publica as portas de [§8.2](#82-componentes-e-responsabilidades) em `127.0.0.1`. O frontend usa a rede `edge`. Os serviços de domínio, bancos e Kafka usam a rede `internal`. O Gateway participa das duas redes. Os serviços acessam a infraestrutura em `postgres-stock:5432`, `postgres-billing:5432` e `kafka:9092` (D-018, D-037, D-056, D-058 e D-066).
+- O perfil Spring `docker` configura os hosts internos. O perfil `demo` habilita a carga de dados pela migração repetível `R__seed_demo.sql`. O Compose ativa `docker,demo` por padrão nos serviços de domínio.
 - Seed: 12 produtos (saldos variados, incluindo `balance = 1`, `balance = 0` e um inativo), 5 clientes, 5 notas (`OPEN` ×3, `CLOSED`, `CANCELED`) — detalhado em [modelo-de-dados.md §13](modelo-de-dados.md#13-dados-de-demonstração-seed).
-- Variáveis em `.env.example`: `POSTGRES_*`, `KEYCLOAK_ADMIN*`, `BILLING_CLIENT_SECRET`, `SPRING_PROFILES_ACTIVE`.
+- `.env.example` documenta `POSTGRES_*` e `SPRING_PROFILES_ACTIVE`, com os mesmos valores padrão do Compose.
 
 ---
 
 ## 9. Interface do usuário
+
+O mapa e a tabela de telas incluem as evoluções previstas. Na v0.1.0, o shell abre a demonstração sem login e oferece as telas de produtos, clientes e notas fiscais. A F2 concentra as propostas de perfis, PDF, timeline e diagnóstico. [Demonstração da v0.1.0](../README.md#demonstração)
 
 ### 9.1 Mapa de navegação
 
@@ -1178,8 +1183,8 @@ flowchart LR
 
 | Nível | Escopo | Ferramentas | Critério |
 |---|---|---|---|
-| Unitário (domínio) | Entidades e regras: `Product.debit`, `Invoice` transições, cálculo de totais, validador CPF/CNPJ | JUnit 5, AssertJ | 100 % das regras RN cobertas |
-| Unitário (aplicação) | Use cases com ports mockados; idempotência; mapeamento de erros | JUnit 5, Mockito | Cada use case com caminho feliz + cada exceção |
+| Unitário (domínio) | Entidades e regras: `Product.debit`, `Invoice` transições, cálculo de totais, validador CPF/CNPJ | JUnit Jupiter, AssertJ | 100 % das regras RN cobertas |
+| Unitário (aplicação) | Use cases com ports mockados; idempotência; mapeamento de erros | JUnit Jupiter, Mockito | Cada use case com caminho feliz + cada exceção |
 | Arquitetura | Regras de dependência hexagonal | ArchUnit | Falha o build se violado |
 | Integração (persistência) | Repositórios, constraints, migrações Flyway, optimistic lock | `@DataJpaTest` + Testcontainers PostgreSQL | Todas as constraints exercitadas |
 | Integração (API) | Controllers com segurança (JWT mockado via `spring-security-test`), ProblemDetail, Idempotency-Key | `@SpringBootTest` + `MockMvc` | Cada endpoint × cada status |
@@ -1196,13 +1201,19 @@ flowchart LR
 
 ## 11. Plano de entrega
 
-| Fase | Tag | Conteúdo | Critério de conclusão |
+| Fase | Entrega | Conteúdo | Critério de conclusão |
 |---|---|---|---|
 | **F1 — MVP funcional** | `v0.1.0` | Parent Maven + `common`; `stock-service` (produtos, movimentações, baixa via Kafka, outbox, idempotência, optimistic lock); `billing-service` (clientes, notas, Saga de fechamento, outbox, idempotência); `api-gateway` (roteamento, CORS, sem auth); Angular (shell, produtos, clientes, notas, impressão com polling, tratamento de erros); Docker Compose (bancos, Kafka, serviços, frontend); Flyway + seed; testes unitários, ArchUnit, integração com Testcontainers, teste de concorrência; README quickstart | Fluxo completo criar → imprimir → fechar → saldo baixado funciona via `docker compose up`; cenário de queda do Estoque se recupera; RF Must de F1 com CA verdes |
-| **F2 — Robustez e segurança** | `v0.2.0` | Keycloak (realm, roles, PKCE, client credentials, guards, `@PreAuthorize`); PDF; histórico de status; observabilidade (Prometheus, Grafana, Zipkin, logs JSON, `traceId` na UI); chaos endpoint + página de status; contract tests; OpenAPI/AsyncAPI versionados; ADRs 001–010; diagramas C4 | Todos os RF Must/Should de F2; trace ponta a ponta visível no Zipkin; dashboard funcional |
-| **F3 — Qualidade e entrega** | `v1.0.0` | GitHub Actions (backend, frontend, e2e, release → GHCR); Playwright E2E; reconciliação; refinamentos de UX; GIFs/screenshots; README final com roteiro de demonstração; revisão geral de código e docs | CI verde em `main`; badges; release `v1.0.0` publicada |
+| **F2 — Robustez e segurança** | Evolução possível | Keycloak (realm, roles, PKCE, client credentials, guards, `@PreAuthorize`), PDF, histórico de status na UI, observabilidade, chaos e página de status, testes de contrato, OpenAPI/AsyncAPI, ADRs e diagramas C4 | RF Must/Should de F2, trace ponta a ponta visível no Zipkin e dashboard funcional |
+| **F3 — Qualidade e entrega** | Evolução possível | GitHub Actions, publicação de imagens no GHCR, Playwright E2E, reconciliação, refinamentos de UX, GIFs/screenshots e revisão geral | CI verde em `main` e release publicada |
 
-Estimativa relativa de esforço: F1 ≈ 50 %, F2 ≈ 35 %, F3 ≈ 15 %.
+A entrega de portfólio encerra na F1, identificada pela tag `v0.1.0`. As descrições das fases F2 e F3 registram possibilidades de evolução. [Decisão de escopo (D-029)](decisions.md#d-029--encerramento-da-implementação-na-f1)
+
+### Checklist de conclusão da F1
+
+- Criar produto, cliente e nota, imprimir e conferir o fechamento e a baixa na interface com a stack no Compose.
+- Confirmar que uma impressão aceita durante a queda do Estoque fecha automaticamente após o retorno do serviço.
+- Conferir os critérios de aceite aplicáveis à F1 para os RFs **Must**, com as suítes do backend e do frontend passando.
 
 ---
 

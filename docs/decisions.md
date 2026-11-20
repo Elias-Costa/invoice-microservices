@@ -102,6 +102,7 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-064](#d-064--confirmação-de-saída-dos-formulários-de-produto) | 2026-11-20 | Confirmação de saída dos formulários de produto | aceita | — |
 | [D-065](#d-065--máscara-de-telefone-nos-dados-do-cliente) | 2026-11-20 | Máscara de telefone nos dados do cliente | aceita | — |
 | [D-066](#d-066--execução-local-do-frontend-no-compose) | 2026-11-20 | Execução local do frontend no Compose | aceita | — |
+| [D-067](#d-067--alinhamento-da-documentação-à-v010) | 2026-11-20 | Alinhamento da documentação à v0.1.0 | aceita | — |
 
 ---
 
@@ -1037,5 +1038,19 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: o navegador na máquina de desenvolvimento acessa a aplicação em `http://localhost:4200`, e o Compose verifica que o contêiner entrega a página inicial.
 - **Y-statement**: no contexto da demonstração local da F1, decidimos publicar a interface em loopback e ordenar a subida pelo healthcheck do Gateway para disponibilizar a UI e a API com um único comando.
 - **Documentos afetados**: `docker-compose.yml` · plano local de implementação (F1-29).
+- **ADR**: —
+- **Substitui**: —
+
+### D-067 — Alinhamento da documentação à v0.1.0
+
+- **Data**: 2026-11-20
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: na F1-30, o plano de entrega ainda apresentava F2 e F3 com tags previstas. O ambiente de execução mencionava chaos no perfil `demo`, e o roteiro do seed descrevia a geração de PDF. A D-029 define a F1 como entrega de portfólio e trata F2 e F3 como evoluções possíveis.
+- **Opções consideradas**: 1) alinhar os dois documentos às decisões aceitas para manter a especificação coerente com a demonstração. 2) publicar o recorte da v0.1.0 apenas no README e preservar a redação anterior dos documentos.
+- **Decisão**: o humano autorizou atualizar `requisitos.md` e `modelo-de-dados.md` conforme as decisões já aceitas para a v0.1.0.
+- **Consequências**: os documentos passam a distinguir o ambiente executável da F1 e os recursos previstos para evoluções. O seed e o roteiro descrevem o fechamento e a baixa disponíveis nesta versão.
+- **Y-statement**: no contexto do fechamento da F1, diante das diferenças entre a especificação e as decisões registradas, decidimos alinhar os documentos ao escopo da v0.1.0 para que descrevam a demonstração disponível e orientem as evoluções possíveis.
+- **Documentos afetados**: `requisitos.md` · `modelo-de-dados.md` · plano local de implementação (F1-30).
 - **ADR**: —
 - **Substitui**: —
