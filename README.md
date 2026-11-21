@@ -1,5 +1,14 @@
 # invoice-microservices
 
+![Java 21](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)
+![Spring Boot 4.1.1](https://img.shields.io/badge/Spring_Boot-4.1.1-6DB33F?logo=springboot&logoColor=white)
+![Angular 22.3](https://img.shields.io/badge/Angular-22.3-DD0031?logo=angular&logoColor=white)
+![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Apache Kafka 4.2.1](https://img.shields.io/badge/Apache_Kafka-4.2.1-231F20?logo=apachekafka&logoColor=white)
+![Docker Compose v2](https://img.shields.io/badge/Docker_Compose-v2-2496ED?logo=docker&logoColor=white)
+![Testes com Testcontainers](https://img.shields.io/badge/testes-Testcontainers-007EC6?logo=docker&logoColor=white)
+![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-4C9A2A)
+
 Projeto de portfólio para cadastrar produtos e clientes, acompanhar movimentações de estoque e fechar notas fiscais internas. Ao selecionar **Imprimir**, o Faturamento inicia o fechamento assíncrono. A nota fecha quando o Estoque confirma a baixa. Se faltar saldo, a nota volta a ficar aberta, com o motivo disponível para correção.
 
 A `v0.1.0` é uma demonstração local sem login. As notas representam documentos internos simplificados para demonstrar o fluxo, sem integração com a SEFAZ.
