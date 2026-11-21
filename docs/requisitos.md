@@ -1203,11 +1203,13 @@ flowchart LR
 
 | Fase | Entrega | Conteúdo | Critério de conclusão |
 |---|---|---|---|
-| **F1 — MVP funcional** | `v0.1.0` | Parent Maven + `common`; `stock-service` (produtos, movimentações, baixa via Kafka, outbox, idempotência, optimistic lock); `billing-service` (clientes, notas, Saga de fechamento, outbox, idempotência); `api-gateway` (roteamento, CORS, sem auth); Angular (shell, produtos, clientes, notas, impressão com polling, tratamento de erros); Docker Compose (bancos, Kafka, serviços, frontend); Flyway + seed; testes unitários, ArchUnit, integração com Testcontainers, teste de concorrência; README quickstart | Fluxo completo criar → imprimir → fechar → saldo baixado funciona via `docker compose up`; cenário de queda do Estoque se recupera; RF Must de F1 com CA verdes |
+| **F1 — MVP funcional** | `v0.1.0` | Parent Maven + `common`; `stock-service` (produtos, movimentações, baixa via Kafka, outbox, idempotência, optimistic lock); `billing-service` (clientes, notas, Saga de fechamento, outbox, idempotência); `api-gateway` (roteamento, CORS, sem auth); Angular (shell, produtos, clientes, notas, impressão com polling, tratamento de erros); Docker Compose (bancos, Kafka, serviços, frontend); Flyway + seed; testes unitários, ArchUnit, integração com Testcontainers, teste de concorrência; README com quickstart e prints das telas | Fluxo completo criar → imprimir → fechar → saldo baixado funciona via `docker compose up`; cenário de queda do Estoque se recupera; RF Must de F1 com CA verdes |
 | **F2 — Robustez e segurança** | Evolução possível | Keycloak (realm, roles, PKCE, client credentials, guards, `@PreAuthorize`), PDF, histórico de status na UI, observabilidade, chaos e página de status, testes de contrato, OpenAPI/AsyncAPI, ADRs e diagramas C4 | RF Must/Should de F2, trace ponta a ponta visível no Zipkin e dashboard funcional |
-| **F3 — Qualidade e entrega** | Evolução possível | GitHub Actions, publicação de imagens no GHCR, Playwright E2E, reconciliação, refinamentos de UX, GIFs/screenshots e revisão geral | CI verde em `main` e release publicada |
+| **F3 — Qualidade e entrega** | Evolução possível | GitHub Actions, publicação de imagens no GHCR, Playwright E2E, reconciliação, refinamentos de UX, GIFs de divulgação e revisão geral | CI verde em `main` e release publicada |
 
 A entrega de portfólio encerra na F1, identificada pela tag `v0.1.0`. As descrições das fases F2 e F3 registram possibilidades de evolução. [Decisão de escopo (D-029)](decisions.md#d-029--encerramento-da-implementação-na-f1)
+
+Os prints do README exigidos por [RNF-DOC-01](#79-documentação-rnf-doc) foram entregues na F1, junto com os requisitos de execução que mitigam o R2 do [§13](#13-riscos-e-mitigações); na F3 permanecem apenas os GIFs de divulgação. [Decisão (D-068)](decisions.md#d-068--prints-e-requisitos-de-execução-no-readme)
 
 ### Checklist de conclusão da F1
 
@@ -1237,7 +1239,7 @@ Um requisito é considerado concluído quando:
 | # | Risco | Prob. | Impacto | Mitigação |
 |---|---|---|---|---|
 | R1 | Escopo amplo → projeto não "termina" | Alta | Alto | Fases com tags publicáveis; F1 já é um projeto apresentável |
-| R2 | Stack pesada (Kafka + Keycloak + observabilidade) dificulta o avaliador rodar | Média | Alto | Perfis Compose (`observability`, `tools` opcionais); healthchecks; README com requisitos de memória (~6 GB); GIFs no README para quem não rodar |
+| R2 | Stack pesada (Kafka + Keycloak + observabilidade) dificulta o avaliador rodar | Média | Alto | Perfil Compose `tools` opcional; healthchecks; README com requisitos de execução (~6 GB para a stack completa) e prints das telas para quem não rodar (D-068) |
 | R3 | Complexidade do Keycloak (realm, clients, PKCE) consome tempo | Média | Médio | Realm importado por JSON versionado; deixar para F2 |
 | R4 | Consistência eventual gera estados "presos" em `PROCESSING` | Média | Médio | Idempotência, DLT, job de reconciliação (F3), feedback claro na UI |
 | R5 | Optimistic locking em notas multi-item gera muitos retries sob carga | Baixa | Baixo | Retry local com backoff; carga do projeto é demonstrativa; ADR registra alternativa (UPDATE condicional) |

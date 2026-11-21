@@ -4,6 +4,8 @@ Projeto de portfólio para cadastrar produtos e clientes, acompanhar movimentaç
 
 A `v0.1.0` é uma demonstração local sem login. As notas representam documentos internos simplificados para demonstrar o fluxo, sem integração com a SEFAZ.
 
+![Lista de notas fiscais com os status Aberta, Cancelada e Fechada, filtros por status, cliente e período, e o botão Imprimir nas notas abertas](docs/images/notas-fiscais.png)
+
 ## Arquitetura
 
 ```mermaid
@@ -34,6 +36,8 @@ docker compose up --build -d --wait
 docker compose ps --all
 ```
 
+A stack padrão sobe oito contêineres: dois PostgreSQL, o Kafka, os três serviços Java, o frontend em Nginx e o `kafka-init`, que prepara o volume e encerra. As quatro imagens da aplicação somam cerca de 1,4 GB, além das imagens base de PostgreSQL e Kafka. O primeiro `--build` compila os quatro módulos Maven e roda `npm ci` com o build de produção do Angular, o que leva alguns minutos. O `--wait` espera pelos healthchecks sem limite de tempo; acrescente `--wait-timeout 600` para falhar com mensagem em vez de esperar indefinidamente. O [plano de riscos](docs/requisitos.md#13-riscos-e-mitigações) estimou cerca de 6 GB de memória para a stack completa prevista no projeto — a `v0.1.0` não sobe Keycloak nem observabilidade, então a folga necessária é menor.
+
 Abra [localhost:4200](http://localhost:4200). Os perfis `docker,demo` carregam os dados de demonstração no primeiro uso. O Compose usa os valores padrão documentados em [`.env.example`](.env.example).
 
 | Componente | Endereço local | Uso |
@@ -47,7 +51,7 @@ Abra [localhost:4200](http://localhost:4200). Os perfis `docker,demo` carregam o
 | Kafka | `localhost:9092` | Broker para clientes no host |
 | Kafka UI | `http://localhost:8090` | Inspeção de tópicos, disponível com o perfil `tools` |
 
-Os serviços persistentes da stack padrão ficam `healthy`. O contêiner `kafka-init` termina com código `0` após preparar o volume. Para iniciar a Kafka UI, use `docker compose --profile tools up -d kafka-ui`. Para encerrar preservando os dados, use `docker compose --profile tools down`.
+Os serviços persistentes da stack padrão ficam `healthy`. O contêiner `kafka-init` termina com código `0` após preparar o volume. Para iniciar a Kafka UI, use `docker compose --profile tools up -d kafka-ui`. Para encerrar preservando os dados, use `docker compose down`; se a Kafka UI estiver no ar, acrescente `--profile tools` para removê-la junto.
 
 ## Demonstração
 
@@ -55,15 +59,36 @@ Em um banco recém-populado, há 12 produtos, 5 clientes e 5 notas. A nota `0000
 
 Pela interface, cadastre um produto com saldo inicial 10. Em **Notas fiscais**, crie uma nota para o cliente de exemplo com 2 unidades do produto. Na tela de detalhe, selecione **Imprimir** e aguarde o status **Fechada**. Em **Produtos**, abra o histórico do produto e confira a baixa de 2 unidades e o saldo 8.
 
-Para executar os cinco cenários automatizados, use Bash, `curl` e `jq` a partir da raiz com a stack no ar e os dados do seed intactos. Cada script imprime `PASS` ou `FAIL`. Os roteiros alteram os dados da demonstração. Para repeti-los com os saldos iniciais, encerre a instância em uso com `docker compose down`, exporte `COMPOSE_PROJECT_NAME` com um novo nome e suba a stack. Rode os scripts na mesma sessão.
+As duas telas ao fim do fluxo, aqui com a nota `000001` do seed, que já nasce fechada, e o produto que ela baixou:
+
+![Detalhe da nota fiscal 000001 com o status Fechada, a data de fechamento e os dois itens que somam R$ 55,00](docs/images/nota-fechada.png)
+
+![Histórico de movimentações do PAR-M6-20, com o saldo inicial de 600 e a baixa de 100 unidades referente à NF 1, deixando o saldo em 500](docs/images/historico-produto.png)
+
+Para executar os cinco cenários automatizados, use Bash, `curl` e `jq` a partir da raiz com a stack no ar e os dados do seed intactos. Cada script imprime `PASS` ou `FAIL`. Rode os cinco na mesma instância, na ordem da tabela.
 
 | Cenário | Comando | Resultado esperado |
 |---|---|---|
 | Fluxo feliz | `bash scripts/demo/happy-path.sh` | A nota fecha e o saldo de `ARR-M6` passa de 1.000 para 950, com uma única baixa. |
 | Saldo insuficiente | `bash scripts/demo/insufficient-stock.sh` | A nota `000005` volta a `OPEN` com o motivo e preserva os saldos dos dois itens. |
 | Concorrência | `bash scripts/demo/concurrent-prints.sh` | Só uma das notas `000003` e `000004` fecha. O saldo de `TRE-5M` passa de 1 para 0, sem baixa parcial na nota rejeitada. |
-| Idempotência | `bash scripts/demo/idempotency.sh` | Dois envios com a mesma `Idempotency-Key` recebem o mesmo documento e criam uma única nota. |
+| Idempotência | `bash scripts/demo/idempotency.sh` | Dois envios com a mesma `Idempotency-Key` recebem a mesma nota e criam um único registro. |
 | Queda do Estoque | `bash scripts/demo/stock-outage.sh` | O roteiro para o Estoque, imprime uma nota já criada e verifica `PROCESSING`. Após religar o serviço, a nota fecha automaticamente e baixa uma unidade de `CHV-FEN-6`. |
+
+Os roteiros consomem saldo e fecham notas do seed, então só valem uma rodada. Para repeti-los a partir dos saldos iniciais, recrie os volumes: `docker compose down -v` apaga os dois bancos e o volume do Kafka, e o `up` seguinte recarrega o seed. Use `-v` apenas nesta instância de demonstração.
+
+## Pontos de interesse no código
+
+| Tema | Arquivo |
+|---|---|
+| Baixa idempotente por `print_request_id`, com repetição do resultado já gravado e retentativa sob conflito de versão | [`DebitStockService.java`](backend/stock-service/src/main/java/dev/eliascosta/invoice/stock/application/service/DebitStockService.java) |
+| Evento gravado na Outbox dentro da transação de quem chama — publicado se e somente se a mudança de estado for confirmada | [`OutboxWriter.java`](backend/common/src/main/java/dev/eliascosta/invoice/common/outbox/OutboxWriter.java) |
+| Publicação do que a Outbox acumulou | [`OutboxPublisher.java`](backend/common/src/main/java/dev/eliascosta/invoice/common/outbox/OutboxPublisher.java) |
+| Bloqueio otimista sobre o saldo do produto | [`ProductJpaEntity.java`](backend/stock-service/src/main/java/dev/eliascosta/invoice/stock/adapter/out/persistence/ProductJpaEntity.java) |
+| `Idempotency-Key` nas rotas HTTP: repete a resposta guardada, recusa payload divergente e libera a chave em erro 5xx | [`IdempotencyInterceptor.java`](backend/common/src/main/java/dev/eliascosta/invoice/common/idempotency/IdempotencyInterceptor.java) |
+| Fronteiras da arquitetura hexagonal verificadas no build | [`StockArchitectureTest.java`](backend/stock-service/src/test/java/dev/eliascosta/invoice/stock/StockArchitectureTest.java) |
+| Duas impressões disputando a última unidade de um produto | [`ConcurrentDebitIT.java`](backend/stock-service/src/test/java/dev/eliascosta/invoice/stock/application/service/ConcurrentDebitIT.java) |
+| Saga de impressão ponta a ponta, com PostgreSQL e Kafka reais | [`InvoicePrintSagaIT.java`](backend/billing-service/src/test/java/dev/eliascosta/invoice/billing/adapter/in/rest/InvoicePrintSagaIT.java) |
 
 ## Verificação local
 
@@ -76,6 +101,8 @@ npm --prefix frontend run lint
 npm --prefix frontend test -- --watch=false
 npm --prefix frontend run build
 ```
+
+A suíte do backend reúne 41 classes de teste: 15 de integração que sobem PostgreSQL e Kafka reais com Testcontainers, duas que verificam as fronteiras da arquitetura com ArchUnit — o build falha se o domínio importar Spring, JPA ou Kafka — e uma que põe duas impressões em disputa pela última unidade de um produto. O frontend tem 23 specs em Vitest.
 
 No PowerShell, rode `.\mvnw.cmd -q verify` dentro de `backend/`. Use `npm.cmd` no lugar de `npm` se a política de execução do PowerShell bloquear o script do npm.
 
@@ -92,3 +119,7 @@ A F1 corresponde à entrega de portfólio. A F2 reúne propostas de autenticaç�
 - [Requisitos](docs/requisitos.md)
 - [Modelo de dados](docs/modelo-de-dados.md)
 - [Decisão sobre as versões da plataforma](docs/adr/0001-versoes-da-plataforma.md)
+
+## Licença
+
+[MIT](LICENSE).

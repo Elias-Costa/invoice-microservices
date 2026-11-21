@@ -103,6 +103,10 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 | [D-065](#d-065--máscara-de-telefone-nos-dados-do-cliente) | 2026-11-20 | Máscara de telefone nos dados do cliente | aceita | — |
 | [D-066](#d-066--execução-local-do-frontend-no-compose) | 2026-11-20 | Execução local do frontend no Compose | aceita | — |
 | [D-067](#d-067--alinhamento-da-documentação-à-v010) | 2026-11-20 | Alinhamento da documentação à v0.1.0 | aceita | — |
+| [D-068](#d-068--prints-e-requisitos-de-execução-no-readme) | 2026-11-21 | Prints e requisitos de execução no README | aceita | — |
+| [D-069](#d-069--licença-mit-para-o-repositório) | 2026-11-21 | Licença MIT para o repositório | aceita | — |
+| [D-070](#d-070--alinhamento-do-agentsmd-à-v010) | 2026-11-21 | Alinhamento do `AGENTS.md` à v0.1.0 | aceita | — |
+| [D-071](#d-071--perfil-observability-fora-da-mitigação-do-r2) | 2026-11-21 | Perfil `observability` fora da mitigação do R2 | aceita | — |
 
 ---
 
@@ -1052,5 +1056,61 @@ Registro corrente e cronológico das decisões tomadas durante o projeto: dúvid
 - **Consequências**: os documentos passam a distinguir o ambiente executável da F1 e os recursos previstos para evoluções. O seed e o roteiro descrevem o fechamento e a baixa disponíveis nesta versão.
 - **Y-statement**: no contexto do fechamento da F1, diante das diferenças entre a especificação e as decisões registradas, decidimos alinhar os documentos ao escopo da v0.1.0 para que descrevam a demonstração disponível e orientem as evoluções possíveis.
 - **Documentos afetados**: `requisitos.md` · `modelo-de-dados.md` · plano local de implementação (F1-30).
+- **ADR**: —
+- **Substitui**: —
+
+### D-068 — Prints e requisitos de execução no README
+
+- **Data**: 2026-11-21
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a revisão do README da v0.1.0 apontou que o documento não tinha nenhuma imagem do produto nem requisitos de execução. O risco R2 em `requisitos.md` §13 previa exatamente essas duas mitigações ("requisitos de memória (~6 GB); GIFs no README para quem não rodar"), mas o plano de entrega §11 lista "GIFs/screenshots" como item da F3, que a D-029 deixou fora do escopo. As duas leituras se contradiziam.
+- **Opções consideradas**: 1) tratar prints e requisitos de execução como mitigação do R2, pertencente à entrega da F1, já que existem para quem não vai subir a stack. 2) manter a leitura literal do §11, deixando o README sem imagens por serem item de F3, e aceitar o R2 sem mitigação. 3) dispensar as duas coisas e registrar o R2 como risco aceito.
+- **Decisão**: (1). Prints do produto e requisitos de execução entram no README da v0.1.0. A menção a "GIFs/screenshots" no §11 passa a valer apenas para o material de divulgação mais elaborado da F3, não para as imagens mínimas do README.
+- **Consequências**: + o avaliador que não executa a stack passa a ver o produto e a saber o custo de rodá-lo. − a entrega da F1 ganha um item que o §11 associava à F3. Os requisitos de execução já foram escritos; a captura dos três prints e sua inclusão no README ficam pendentes, porque dependem da stack no ar e de arquivos de imagem que o agente não gera.
+- **Y-statement**: no contexto do encerramento da v0.1.0, diante da contradição entre a mitigação do R2 e o recorte de fases do §11, decidimos incluir prints e requisitos de execução no README da F1 para que o projeto seja avaliável sem ser executado, aceitando ampliar levemente o escopo da entrega.
+- **Documentos afetados**: `README.md` · `requisitos.md` §11 e §13 (alinhamento pendente de confirmação).
+- **ADR**: —
+- **Substitui**: —
+
+### D-069 — Licença MIT para o repositório
+
+- **Data**: 2026-11-21
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: o repositório é público e não tinha arquivo de licença, o que equivale a reservar todos os direitos e impede que outra pessoa clone o projeto para estudar. Nenhum documento do projeto tratava de licenciamento.
+- **Opções consideradas**: 1) MIT, permissiva e curta, convenção dominante em repositórios de portfólio. 2) Apache-2.0, permissiva com concessão explícita de patentes e exigência de aviso de alterações, mais longa. 3) seguir sem licença, mantendo todos os direitos reservados.
+- **Decisão**: (1). MIT, com titularidade do autor e ano de 2026.
+- **Consequências**: + quem avalia pode clonar, executar e reaproveitar o código sem dúvida jurídica. − nenhuma cláusula de patentes, ao contrário da Apache-2.0; irrelevante para o propósito de portfólio.
+- **Y-statement**: no contexto de um repositório público de portfólio, diante da ausência de licença explícita, decidimos adotar a MIT para liberar estudo e reaproveitamento do código, aceitando não ter cláusula de patentes.
+- **Documentos afetados**: `LICENSE` (criado) · `README.md`.
+- **ADR**: —
+- **Substitui**: —
+
+### D-070 — Alinhamento do AGENTS.md à v0.1.0
+
+- **Data**: 2026-11-21
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: o `AGENTS.md` é versionado, público e citado pelo README como prova do processo de implementação, mas descrevia um repositório diferente do entregue: anunciava "repositório em fase de documentação", listava Keycloak na stack, documentava `npx playwright test` em `e2e/`, o perfil `observability` do Compose e os diretórios `infra/keycloak`, `infra/grafana`, `infra/prometheus`, `docs/architecture/` e `docs/api/` — nenhum deles existente. A D-067 já havia alinhado `requisitos.md` e `modelo-de-dados.md` à v0.1.0 e deixou o `AGENTS.md` de fora.
+- **Opções consideradas**: 1) alinhar o `AGENTS.md` ao repositório entregue, como a D-067 fez com os documentos de especificação. 2) preservar a redação como registro do plano original das três fases.
+- **Decisão**: (1). O `AGENTS.md` passa a descrever apenas comandos, diretórios e contratos existentes, e indica explicitamente o que pertence à F2 como evolução possível.
+- **Consequências**: + um agente que entra no repositório não recebe comandos que falham nem procura diretórios ausentes, e quem lê o repositório não encontra um contrato que descreve outro projeto. − o plano original das fases deixa de aparecer no `AGENTS.md`; permanece em `requisitos.md` §11. Também foi registrado no arquivo que `.claude/rules/` não é versionado, já que a tabela de regras aponta para caminhos ausentes no repositório público.
+- **Y-statement**: no contexto do encerramento da v0.1.0, diante de um `AGENTS.md` público que descrevia comandos e diretórios inexistentes, decidimos alinhá-lo ao repositório entregue para que sirva de contrato verificável, aceitando perder nele o registro do plano original das fases.
+- **Documentos afetados**: `AGENTS.md`.
+- **ADR**: —
+- **Substitui**: —
+
+### D-071 — Perfil `observability` fora da mitigação do R2
+
+- **Data**: 2026-11-21
+- **Status**: aceita
+- **Decisor**: humano (proposta: agente)
+- **Contexto**: a mitigação do R2 em `requisitos.md` §13 oferecia "Perfis Compose (`observability`, `tools` opcionais)" como alívio para quem considera a stack pesada. O `docker-compose.yml` da v0.1.0 define apenas o perfil `tools`, com a Kafka UI; não existe perfil `observability`, porque Prometheus, Grafana e Zipkin pertencem à F2. A revisão do README localizou o resíduo, que a D-067 não havia alcançado.
+- **Opções consideradas**: 1) remover a menção ao perfil inexistente, deixando a mitigação descrever o que o repositório realmente oferece. 2) manter o texto como registro do plano original das três fases, aceitando que o §13 ofereça um comando que falha.
+- **Decisão**: (1). A mitigação passa a citar apenas o perfil `tools`.
+- **Consequências**: + o §13 deixa de oferecer ao avaliador um perfil que o Compose recusaria. − o plano de ter observabilidade opcional deixa de aparecer no registro de riscos, permanecendo na descrição da F2 em §11. O texto do risco em si continua descrevendo a stack como "Kafka + Keycloak + observabilidade", o que vale para o projeto completo e não para a v0.1.0.
+- **Y-statement**: no contexto do encerramento da v0.1.0, diante de uma mitigação que citava um perfil Compose inexistente, decidimos restringi-la ao perfil `tools` para que o §13 descreva o repositório entregue, aceitando perder ali o registro da observabilidade opcional.
+- **Documentos afetados**: `requisitos.md` §13.
 - **ADR**: —
 - **Substitui**: —

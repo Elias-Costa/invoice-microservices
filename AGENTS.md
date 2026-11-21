@@ -1,6 +1,6 @@
 # invoice-microservices — instruções para agentes de código
 
-Sistema de emissão de notas fiscais em microsserviços: Java 21 + Spring Boot 4 (`stock-service`, `billing-service`, `api-gateway`), Apache Kafka, PostgreSQL (um banco por serviço), Keycloak, Angular 20+ com Angular Material, Docker Compose. Projeto de portfólio.
+Sistema de emissão de notas fiscais em microsserviços: Java 21 + Spring Boot 4 (`stock-service`, `billing-service`, `api-gateway`), Apache Kafka, PostgreSQL (um banco por serviço), Angular 22 com Angular Material, Docker Compose. Projeto de portfólio. A entrega é a `v0.1.0`, correspondente à F1: demonstração local sem autenticação. Keycloak, PDF e observabilidade são evoluções possíveis da F2 e não existem no repositório ([plano de entrega](docs/requisitos.md#11-plano-de-entrega)).
 
 ## Papéis e fonte da verdade
 
@@ -14,13 +14,11 @@ Sistema de emissão de notas fiscais em microsserviços: Java 21 + Spring Boot 4
 
 ## Comandos
 
-> Estado: repositório em fase de documentação. Os comandos abaixo são o contrato definido em `docs/requisitos.md`; a primeira tarefa de bootstrap deve confirmá-los e atualizar esta seção.
-
 ```bash
 # Backend (Maven multi-módulo, wrapper) — executar em backend/
 ./mvnw -q verify                                   # build + testes de todos os módulos (usa Testcontainers: Docker precisa estar rodando)
 ./mvnw -q -pl stock-service -am verify             # um módulo e suas dependências
-./mvnw -q -pl billing-service test -Dtest=InvoiceTest   # um teste
+./mvnw -q -pl stock-service test -Dtest=ProductServiceTest   # um teste
 ./mvnw spotless:apply                              # formatar (google-java-format)
 
 # Frontend (Angular) — executar em frontend/
@@ -29,14 +27,10 @@ npm run lint
 npm test -- --watch=false                          # Vitest
 npm run build
 
-# E2E (Playwright) — executar em e2e/, com o compose no ar
-npx playwright test
-
 # Infra local — executar na raiz
-docker compose up --build -d                       # stack completa (infra: postgres-stock 5433, postgres-billing 5434, kafka 9092 — só em 127.0.0.1)
-docker compose --profile tools up -d               # + Kafka UI em http://localhost:8090
-docker compose --profile observability up -d       # + Prometheus, Grafana, Zipkin
-docker compose ps                                  # todos devem ficar `healthy`
+docker compose up --build -d --wait                # stack completa (infra: postgres-stock 5433, postgres-billing 5434, kafka 9092 — só em 127.0.0.1)
+docker compose --profile tools up -d kafka-ui      # + Kafka UI em http://localhost:8090
+docker compose ps --all                            # serviços persistentes `healthy`; `kafka-init` sai com código 0
 docker compose logs -f stock-service
 docker compose down                                # NUNCA use -v sem confirmar: apaga os bancos
 ```
@@ -46,17 +40,17 @@ docker compose down                                # NUNCA use -v sem confirmar:
 ```
 backend/{common,api-gateway,stock-service,billing-service}   # Maven multi-módulo
 frontend/                                                    # Angular workspace
-infra/{keycloak,grafana,prometheus,nginx}                    # configs versionadas
-e2e/                                                         # Playwright
-docs/{requisitos.md,modelo-de-dados.md,decisions.md,adr/,architecture/,api/}
+infra/{kafka,nginx,postgres}                                 # configs versionadas
+scripts/demo/                                                # roteiros de demonstração em Bash
+docs/{requisitos.md,modelo-de-dados.md,decisions.md,guia-trabalho-com-agente.md,adr/}
 ```
 
-O Claude Code carrega as regras por área automaticamente. Antes de editar, o Codex abre os mesmos arquivos conforme o escopo da tarefa.
+O Claude Code carrega as regras por área automaticamente. Antes de editar, o Codex abre os mesmos arquivos conforme o escopo da tarefa. Os arquivos de regra ficam em `.claude/rules/`, que é local e não versionado — as convenções que importam para quem lê o repositório estão nas seções abaixo.
 
 | Escopo | Regras |
 |---|---|
 | `backend/**` | `.claude/rules/backend-java.md` |
-| `frontend/**` e `e2e/**` | `.claude/rules/frontend-angular.md` |
+| `frontend/**` | `.claude/rules/frontend-angular.md` |
 | `docs/**` e Markdown na raiz | `.claude/rules/docs.md` |
 
 ## Convenções que diferem do padrão
@@ -65,7 +59,7 @@ O Claude Code carrega as regras por área automaticamente. Antes de editar, o Co
 - **Java**: arquitetura hexagonal (`domain` sem Spring/JPA/Kafka — ArchUnit falha o build); `record` para DTOs/comandos; **sem Lombok**; MapStruct para mapeamento; erros em `ProblemDetail` (RFC 9457) com o catálogo de `type` do `requisitos.md` §8.8; `@Version` para concorrência; nada de `float/double` para dinheiro.
 - **Banco**: schema só via Flyway (`ddl-auto=validate`); DDL de referência em `modelo-de-dados.md` Apêndice A; migração já revisada pelo humano nunca é editada — crie a próxima versão.
 - **Angular**: standalone, signals, `@if/@for`, `inject()`, `input()/output()`, `OnPush` em todo componente, Reactive Forms tipados, RxJS apenas para HTTP e streams (polling, debounce).
-- **Eventos/REST**: contratos em `requisitos.md` §8.6–8.7 e `docs/api/`; mudar contrato = perguntar antes.
+- **Eventos/REST**: contratos em `requisitos.md` §8.6–8.7; mudar contrato = perguntar antes.
 
 ## Testes
 
@@ -90,7 +84,7 @@ O Claude Code carrega as regras por área automaticamente. Antes de editar, o Co
 ⚠️ **Perguntar antes**
 - Qualquer ponto não explícito ou contraditório nos documentos.
 - Adicionar ou trocar dependência, biblioteca ou versão.
-- Alterar schema, migração, contrato REST, contrato de evento, portas, `docker-compose.yml`, realm do Keycloak.
+- Alterar schema, migração, contrato REST, contrato de evento, portas ou `docker-compose.yml`.
 - Editar `docs/requisitos.md` ou `docs/modelo-de-dados.md`.
 - Apagar arquivos, remover código existente que não seja parte explícita da tarefa, rodar comandos destrutivos (`docker compose down -v`, `rm -rf`, `DROP`).
 
@@ -105,7 +99,7 @@ O Claude Code carrega as regras por área automaticamente. Antes de editar, o Co
 
 1. Código e testes implementados conforme os critérios de aceite citados.
 2. `./mvnw -q verify` e/ou `npm run lint && npm test -- --watch=false` verdes para os módulos tocados (saída no relatório).
-3. Migração Flyway / OpenAPI / AsyncAPI atualizados quando schema ou contrato mudou.
+3. Migração Flyway versionada quando o schema mudou; `requisitos.md` §8.6–8.7 atualizado quando um contrato REST ou de evento mudou.
 4. Decisões registradas em `docs/decisions.md`; documentos fonte da verdade atualizados se necessário.
 5. Nenhum arquivo fora do escopo da tarefa alterado.
 
